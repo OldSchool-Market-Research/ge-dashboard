@@ -1,0 +1,108 @@
+{{define "head"}}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · ge</title>
+<script src="/static/htmx.min.js"></script>
+<script src="/static/htmx-sse.js"></script>
+<style>
+:root{--bg:#0e1116;--panel:#161b23;--panel2:#1c2330;--text:#dbe2ee;--dim:#8b96a8;
+  --ok:#3fb26f;--warn:#d9a13c;--bad:#e05252;--accent:#5b9dd9;--border:#252d3b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+nav{display:flex;gap:1.4rem;align-items:baseline;padding:.9rem 1.4rem;
+  background:var(--panel);border-bottom:1px solid var(--border)}
+nav .brand{font-weight:700;color:var(--text);letter-spacing:.5px}
+nav a{color:var(--dim)}nav a.active{color:var(--text);font-weight:600}
+main{max-width:1080px;margin:0 auto;padding:1.4rem}
+h1{font-size:1.3rem;margin:.2rem 0 1rem}h2{font-size:1.05rem;margin:1.4rem 0 .6rem}
+.err{background:#3a1f22;border:1px solid var(--bad);padding:.7rem 1rem;border-radius:8px;margin-bottom:1rem}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  padding:1rem 1.2rem;margin-bottom:1rem}
+.cardhead{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap}
+.cardhead .t{font-weight:650;font-size:1.05rem}
+.pill{display:inline-block;padding:.1rem .6rem;border-radius:999px;font-size:.78rem;font-weight:600}
+.pill.ok{background:#173527;color:var(--ok)}.pill.warn{background:#3a2e15;color:var(--warn)}
+.pill.bad{background:#3a1c1c;color:var(--bad)}.pill.unknown{background:var(--panel2);color:var(--dim)}
+.pill.arch{background:#1c2c40;color:var(--accent)}
+.nums{display:flex;gap:1.6rem;flex-wrap:wrap;margin:.7rem 0}
+.nums div{min-width:6.5rem}
+.nums .l{color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em}
+.nums .v{font-size:1.15rem;font-weight:650;font-variant-numeric:tabular-nums}
+.thesis{color:var(--dim);margin:.4rem 0 0}
+.kill{color:var(--warn);font-size:.88rem;margin-top:.4rem}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:.45rem .7rem;border-bottom:1px solid var(--border)}
+th{color:var(--dim);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em}
+tr:hover td{background:var(--panel2)}
+form.brief{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem}
+form.brief label{display:block;color:var(--dim);font-size:.78rem;margin-bottom:.2rem}
+form.brief input,form.brief select,form.brief textarea{width:100%;background:var(--panel2);
+  border:1px solid var(--border);color:var(--text);border-radius:6px;padding:.4rem .6rem;font:inherit}
+form.brief .full{grid-column:1/-1}
+button{background:var(--accent);border:0;color:#0b1420;font-weight:700;padding:.55rem 1.2rem;
+  border-radius:8px;cursor:pointer;font:inherit}
+button:hover{filter:brightness(1.1)}
+.log{background:#0a0d12;border:1px solid var(--border);border-radius:8px;padding:.8rem 1rem;
+  font:12.5px/1.6 ui-monospace,monospace;max-height:24rem;overflow-y:auto;white-space:pre-wrap}
+.report{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:1.2rem 1.6rem;overflow-x:auto}
+.report pre{overflow-x:auto;background:var(--panel2);padding:.7rem;border-radius:6px}
+.report table{font-size:.9rem}
+.dim{color:var(--dim)}.mono{font-family:ui-monospace,monospace}
+details summary{cursor:pointer;color:var(--dim)}
+.check{font-size:.82rem;margin-right:.7rem;white-space:nowrap}
+.check.ok::before{content:"✓ ";color:var(--ok)}.check.bad::before{content:"✗ ";color:var(--bad)}
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">ge</span>
+  <a href="/" {{if eq .Active "index"}}class="active"{{end}}>Actionable now</a>
+  <a href="/runs" {{if eq .Active "runs"}}class="active"{{end}}>Runs</a>
+  <a href="/scoreboard" {{if eq .Active "scoreboard"}}class="active"{{end}}>Scoreboard</a>
+</nav>
+<main>
+{{if .Err}}<div class="err">{{.Err}}</div>{{end}}
+{{end}}
+
+{{define "foot"}}
+</main>
+</body>
+</html>
+{{end}}
+
+{{define "strategy_card"}}
+<div class="card">
+  <div class="cardhead">
+    <span>
+      <span class="pill arch">{{.Archetype}}</span>
+      <a class="t" href="/strategies/{{.StrategyID}}">{{.Title}}</a>
+    </span>
+    <span>
+      {{if .LiveVerdict}}<span class="pill {{verdictClass .LiveVerdict}}">{{.LiveVerdict}}</span>{{end}}
+      <span class="pill {{if eq .State "open"}}ok{{else if eq .State "killed"}}bad{{else}}unknown{{end}}">{{.State}}</span>
+      <span class="pill unknown">{{.Confidence}}</span>
+    </span>
+  </div>
+  <div class="nums">
+    <div><div class="l">buy ≤</div><div class="v">{{gp .EntryPriceP}}</div></div>
+    <div><div class="l">sell ≥</div><div class="v">{{gp .ExitPriceP}}</div></div>
+    <div><div class="l">units</div><div class="v">{{gp .UnitsUsed}}</div></div>
+    <div><div class="l">gp/4h proj</div><div class="v">{{gp .Per4hGp}}</div></div>
+    {{if .Live}}{{if .Live.RealizedPer4hGp}}
+    <div><div class="l">gp/4h now</div><div class="v">{{gp .Live.RealizedPer4hGp}}</div></div>
+    {{end}}{{end}}
+    <div><div class="l">roi</div><div class="v">{{pct .RoiPct}}</div></div>
+    <div><div class="l">capital</div><div class="v">{{gp .Capital}}</div></div>
+  </div>
+  {{if .LiveChecks}}<div>
+    {{range $k, $ok := .LiveChecks}}<span class="check {{if $ok}}ok{{else}}bad{{end}}">{{$k}}</span>{{end}}
+  </div>{{end}}
+  <p class="thesis">{{.Thesis}}</p>
+  <p class="kill">Kill switch: {{.Invalidation}}</p>
+</div>
+{{end}}

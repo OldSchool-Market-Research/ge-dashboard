@@ -1,0 +1,5 @@
+{{template "head" .}}
+<h1>Actionable now <span class="dim">— latest run, live-checked against current prices</span></h1>
+{{if not .Data}}<p class="dim">No strategies yet. <a href="/runs">Trigger a run</a>.</p>{{end}}
+{{range .Data}}{{template "strategy_card" .}}{{end}}
+{{template "foot" .}}

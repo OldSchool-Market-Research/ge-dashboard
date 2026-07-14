@@ -1,0 +1,41 @@
+{{template "head" .}}
+<h1>Runs</h1>
+
+<div class="card">
+  <h2 style="margin-top:0">New run brief</h2>
+  <form class="brief" method="post" action="/runs">
+    <div><label>Capital (gp)</label><input name="capital_gp" value="100000000"></div>
+    <div><label>Risk</label><select name="risk">
+      <option>low</option><option selected>medium</option><option>high</option></select></div>
+    <div><label>Min confidence</label><select name="min_confidence">
+      <option>high</option><option selected>medium</option><option>low</option></select></div>
+    <div><label>Members items</label><select name="members">
+      <option value="">any</option><option value="true">members ok</option><option value="false">F2P only</option></select></div>
+    <div class="full" style="display:grid;grid-template-columns:repeat(7,1fr);gap:.6rem">
+      <div><label>A flips</label><input name="w_A" value="1.0"></div>
+      <div><label>B reversion</label><input name="w_B" value="1.0"></div>
+      <div><label>C range</label><input name="w_C" value="1.0"></div>
+      <div><label>D surge</label><input name="w_D" value="1.0"></div>
+      <div><label>E momentum</label><input name="w_E" value="1.0"></div>
+      <div><label>F seasonal</label><input name="w_F" value="1.0"></div>
+      <div><label>G alch</label><input name="w_G" value="1.0"></div>
+    </div>
+    <div class="full"><label>Notes to the agent</label><textarea name="notes" rows="2" placeholder="optional free text appended to the brief"></textarea></div>
+    <div class="full"><button type="submit">Run research cycle</button>
+      <span class="dim" style="margin-left:.8rem">weights: 0 = don't pitch, 1 = normal, 2 = favor heavily</span></div>
+  </form>
+</div>
+
+<table>
+  <tr><th>#</th><th>started</th><th>status</th><th>strategies</th><th>note</th></tr>
+  {{range .Data.Runs}}
+  <tr>
+    <td><a href="/runs/{{.RunID}}">{{.RunID}}</a></td>
+    <td>{{since .StartedAt}}</td>
+    <td><span class="pill {{if eq .Status "succeeded"}}ok{{else if eq .Status "failed"}}bad{{else}}warn{{end}}">{{.Status}}</span></td>
+    <td>{{.NStrats}}</td>
+    <td class="dim">{{if .FailReason}}{{.FailReason}}{{end}}</td>
+  </tr>
+  {{end}}
+</table>
+{{template "foot" .}}
