@@ -1,0 +1,73 @@
+{{template "head" .}}
+<h1>P&amp;L <span class="dim">— paper gp committed vs earned; haircut estimates, upper bounds, not a ledger</span></h1>
+{{if .Data}}{{with .Data}}
+<div class="card">
+  <div class="nums">
+    <div><div class="l">committed (open book)</div><div class="v">{{gpn .CommittedGp}}</div></div>
+    <div><div class="l">open positions p&amp;l</div><div class="v {{signClass .OpenPnLGp}}">{{gpn .OpenPnLGp}}</div></div>
+    <div><div class="l">realized, last 7d</div><div class="v {{signClass .Realized7dGp}}">{{gpn .Realized7dGp}}</div></div>
+    <div><div class="l">net all-time</div><div class="v {{signClass .NetAllTimeGp}}">{{gpn .NetAllTimeGp}}</div></div>
+  </div>
+  <div class="bars">
+    {{range .Days}}
+    <div class="baru" title="{{.Title}}">
+      <div class="half top">{{if and .Up (gt .H 0)}}{{if .Mark}}<span class="dval">{{.Mark}}</span>{{end}}<span class="bar pos" style="height:{{.H}}px"></span>{{end}}</div>
+      <div class="axis"></div>
+      <div class="half bot">{{if and (not .Up) (gt .H 0)}}<span class="bar neg" style="height:{{.H}}px"></span>{{if .Mark}}<span class="dval">{{.Mark}}</span>{{end}}{{end}}</div>
+      <div class="dlab">{{.Label}}</div>
+    </div>
+    {{end}}
+  </div>
+  <p class="dim sub">Net realized per close date, last 14 days (UTC). Bars above the line earned, below lost.</p>
+</div>
+
+<h2>By archetype</h2>
+<table>
+  <tr><th>archetype</th><th>strategies</th><th>open</th><th>est realized</th><th>projected</th></tr>
+  {{range .ByArch}}
+  <tr>
+    <td><span class="pill arch">{{.Archetype}}</span></td>
+    <td>{{.N}}</td>
+    <td>{{.OpenN}}</td>
+    <td class="{{signClass .EstRealizedGp}}">{{gpn .EstRealizedGp}}</td>
+    <td class="dim">{{gpn .Projected}}</td>
+  </tr>
+  {{end}}
+</table>
+
+<h2>Open book</h2>
+{{if not .Open}}<p class="dim">Nothing open.</p>{{else}}
+<table>
+  <tr><th>strategy</th><th></th><th>state</th><th>capital</th><th>est p&amp;l</th><th>held</th></tr>
+  {{range .Open}}
+  <tr>
+    <td><span class="pill arch">{{.Archetype}}</span></td>
+    <td><a href="/strategies/{{.StrategyID}}">{{.Title}}</a></td>
+    <td><span class="pill {{statePill .State}}">{{.State}}</span></td>
+    <td>{{gp .Capital}}</td>
+    <td class="{{signClass (deref .EstRealizedGp)}}">{{gp .EstRealizedGp}}</td>
+    <td class="dim">{{printf "%.1fh" .Hours}}</td>
+  </tr>
+  {{end}}
+</table>
+{{end}}
+
+<h2>Recently closed</h2>
+{{if not .Closed}}<p class="dim">Nothing closed yet.</p>{{else}}
+<table>
+  <tr><th>strategy</th><th></th><th>outcome</th><th>est realized</th><th>projected</th><th>lived</th><th>closed</th></tr>
+  {{range .Closed}}
+  <tr>
+    <td><span class="pill arch">{{.Archetype}}</span></td>
+    <td><a href="/strategies/{{.StrategyID}}">{{.Title}}</a></td>
+    <td><span class="pill {{statePill .State}}">{{.State}}</span></td>
+    <td class="{{signClass (deref .EstRealizedGp)}}">{{gp .EstRealizedGp}}</td>
+    <td class="dim">{{gp .ProjectedGp}}</td>
+    <td class="dim">{{printf "%.1fh" .Hours}}</td>
+    <td class="dim">{{sinceP .ClosedAt}}</td>
+  </tr>
+  {{end}}
+</table>
+{{end}}
+{{end}}{{end}}
+{{template "foot" .}}
