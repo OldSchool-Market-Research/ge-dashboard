@@ -202,6 +202,33 @@ type TrendRow struct {
 
 func (t TrendRow) MetricsText() string { return string(t.Metrics) }
 
+// PnLRow is one strategy's paper-trade estimate from /api/pnl: median
+// haircut realized_per_1h over its evaluated life × hours in that life.
+// Estimates, not a ledger — upper-bounded like every paper number.
+type PnLRow struct {
+	StrategyID    int64      `json:"strategy_id"`
+	Sid           string     `json:"sid"`
+	Title         string     `json:"title"`
+	Archetype     string     `json:"archetype"`
+	State         string     `json:"state"`
+	OpenedAt      time.Time  `json:"opened_at"`
+	ClosedAt      *time.Time `json:"closed_at"`
+	Hours         float64    `json:"hours"`
+	EstRealizedGp *int64     `json:"est_realized_gp"`
+	ProjectedGp   *int64     `json:"projected_gp"`
+	Capital       *int64     `json:"capital_required"`
+}
+
+type PnLResp struct {
+	AsOf       time.Time `json:"as_of"`
+	Strategies []PnLRow  `json:"strategies"`
+}
+
+func (c *Client) PnL(ctx context.Context) (*PnLResp, error) {
+	var out PnLResp
+	return &out, c.get(ctx, "/api/pnl", &out)
+}
+
 func (c *Client) Health(ctx context.Context) (*Health, error) {
 	var h Health
 	return &h, c.get(ctx, "/api/health", &h)

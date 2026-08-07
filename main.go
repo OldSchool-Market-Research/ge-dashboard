@@ -15,6 +15,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -44,6 +45,17 @@ func main() {
 
 	funcs := template.FuncMap{
 		"gp":      formatGp,
+		"gpn":     func(v int64) string { return formatGp(&v) },
+		"deref":   deref,
+		"signClass": func(v int64) string {
+			switch {
+			case v > 0:
+				return "c-ok"
+			case v < 0:
+				return "c-bad"
+			}
+			return "dim"
+		},
 		"pct":     func(f *float64) string { if f == nil { return "—" }; return fmt.Sprintf("%.2f%%", *f) },
 		"ratio":   func(f *float64) string { if f == nil { return "—" }; return fmt.Sprintf("%.2f", *f) },
 		"since":   since,
@@ -83,6 +95,7 @@ func main() {
 	mux.HandleFunc("GET /runs/{id}", s.run)
 	mux.HandleFunc("GET /strategies/{id}", s.strategy)
 	mux.HandleFunc("GET /scoreboard", s.scoreboard)
+	mux.HandleFunc("GET /pnl", s.pnl)
 	mux.HandleFunc("GET /signals", s.signals)
 	mux.HandleFunc("GET /info", s.info)
 	mux.HandleFunc("GET /status", s.status)
@@ -297,6 +310,157 @@ func (s *server) scoreboard(w http.ResponseWriter, r *http.Request) {
 		p.Err = "orchestrator unreachable: " + err.Error()
 	}
 	s.render(w, r, "scoreboard.html", p)
+}
+
+// pnlView shapes /api/pnl for the "spent vs earned" page. All numbers are
+// paper estimates with the self-impact haircut — upper bounds, not a ledger.
+type pnlView struct {
+	AsOf          time.Time
+	CommittedGp   int64 // capital tied up in the open book ("spent")
+	OpenPnLGp     int64 // est realized accruing on open positions
+	Realized7dGp  int64 // est realized of strategies closed in the last 7d
+	NetAllTimeGp  int64 // est realized across every evaluated strategy
+	ByArch        []pnlArch
+	Days          []pnlDay
+	Open          []orch.PnLRow
+	Closed        []orch.PnLRow
+}
+
+type pnlArch struct {
+	Archetype                string
+	N, OpenN                 int
+	EstRealizedGp, Projected int64
+}
+
+// pnlDay is one column of the daily net-realized strip. Height is
+// precomputed in pixels; sign is encoded by direction (color is redundant).
+type pnlDay struct {
+	Label string // day of month
+	Title string // full date + value, the hover tooltip
+	Val   int64
+	H     int
+	Up    bool
+	Mark  string // direct label, set only on the extreme days
+}
+
+const pnlHalfPx = 56 // px height of each half of the daily strip
+
+func (s *server) pnl(w http.ResponseWriter, r *http.Request) {
+	res, err := s.orch.PnL(r.Context())
+	p := page{Title: "P&L", Active: "pnl"}
+	if err != nil {
+		p.Err = "orchestrator unreachable: " + err.Error()
+		s.render(w, r, "pnl.html", p)
+		return
+	}
+	v := &pnlView{AsOf: res.AsOf}
+	now := time.Now().UTC()
+	byArch := map[string]*pnlArch{}
+	byDay := map[string]int64{}
+	for _, row := range res.Strategies {
+		est := int64(0)
+		if row.EstRealizedGp != nil {
+			est = *row.EstRealizedGp
+		}
+		v.NetAllTimeGp += est
+		a := byArch[row.Archetype]
+		if a == nil {
+			a = &pnlArch{Archetype: row.Archetype}
+			byArch[row.Archetype] = a
+		}
+		a.N++
+		a.EstRealizedGp += est
+		if row.ProjectedGp != nil {
+			a.Projected += *row.ProjectedGp
+		}
+		switch row.State {
+		case "open", "armed":
+			a.OpenN++
+			if row.Capital != nil {
+				v.CommittedGp += *row.Capital
+			}
+			v.OpenPnLGp += est
+			v.Open = append(v.Open, row)
+		default: // killed / expired / confirmed
+			if row.ClosedAt != nil {
+				if now.Sub(*row.ClosedAt) <= 7*24*time.Hour {
+					v.Realized7dGp += est
+				}
+				byDay[row.ClosedAt.UTC().Format("2006-01-02")] += est
+			}
+			v.Closed = append(v.Closed, row)
+		}
+	}
+	for _, k := range []string{"F", "B", "V", "C", "U", "S", "H"} {
+		if a := byArch[k]; a != nil {
+			v.ByArch = append(v.ByArch, *a)
+		}
+	}
+	sort.Slice(v.Open, func(i, j int) bool { return deref(v.Open[i].EstRealizedGp) > deref(v.Open[j].EstRealizedGp) })
+	sort.Slice(v.Closed, func(i, j int) bool {
+		return v.Closed[i].ClosedAt != nil && v.Closed[j].ClosedAt != nil && v.Closed[i].ClosedAt.After(*v.Closed[j].ClosedAt)
+	})
+	if len(v.Closed) > 15 {
+		v.Closed = v.Closed[:15]
+	}
+	v.Days = dailyBars(byDay, now, 14)
+	p.Data = v
+	s.render(w, r, "pnl.html", p)
+}
+
+// dailyBars renders the trailing-days net-realized values as fixed-height
+// columns: linear scale, ±maxAbs mapped to pnlHalfPx, minimum 2px so a
+// nonzero day is visible. The extreme gain and loss get direct labels.
+func dailyBars(byDay map[string]int64, now time.Time, days int) []pnlDay {
+	var out []pnlDay
+	var maxAbs, minVal, maxVal int64
+	for i := days - 1; i >= 0; i-- {
+		d := now.AddDate(0, 0, -i)
+		val := byDay[d.Format("2006-01-02")]
+		if a := abs64(val); a > maxAbs {
+			maxAbs = a
+		}
+		if val > maxVal {
+			maxVal = val
+		}
+		if val < minVal {
+			minVal = val
+		}
+		out = append(out, pnlDay{
+			Label: d.Format("2"),
+			Title: d.Format("Jan 2") + ": " + formatGp(&val) + " gp",
+			Val:   val,
+			Up:    val >= 0,
+		})
+	}
+	for i := range out {
+		if maxAbs == 0 {
+			continue
+		}
+		h := int(float64(pnlHalfPx) * float64(abs64(out[i].Val)) / float64(maxAbs))
+		if h < 2 && out[i].Val != 0 {
+			h = 2
+		}
+		out[i].H = h
+		if v := out[i].Val; v != 0 && ((v == maxVal && v > 0) || (v == minVal && v < 0)) {
+			out[i].Mark = formatGp(&v)
+		}
+	}
+	return out
+}
+
+func abs64(v int64) int64 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+func deref(p *int64) int64 {
+	if p == nil {
+		return 0
+	}
+	return *p
 }
 
 // --- helpers ---

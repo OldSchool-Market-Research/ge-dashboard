@@ -71,6 +71,17 @@ table.inset{margin:.6rem 0;width:auto}
   background:var(--panel2);border-bottom:1px solid var(--border);min-height:1.9rem}
 .strip b{font-variant-numeric:tabular-nums}
 .strip .sep{color:var(--dim)}
+.bars{display:flex;gap:6px;align-items:stretch;margin:.9rem 0 .2rem}
+.baru{flex:1;display:flex;flex-direction:column;align-items:center;min-width:12px}
+.baru .half{height:56px;width:100%;display:flex;flex-direction:column;align-items:center}
+.baru .half.top{justify-content:flex-end}
+.baru .half.bot{justify-content:flex-start}
+.baru .bar{width:70%;max-width:22px;display:block}
+.baru .bar.pos{background:var(--ok);border-radius:3px 3px 0 0}
+.baru .bar.neg{background:var(--bad);border-radius:0 0 3px 3px}
+.baru .axis{height:1px;width:100%;background:var(--border)}
+.baru .dlab{font-size:.65rem;color:var(--dim);margin-top:.25rem}
+.baru .dval{font-size:.68rem;color:var(--dim);white-space:nowrap;padding:.1rem 0}
 .dot{display:inline-block;width:.55rem;height:.55rem;border-radius:50%}
 .dot.run{background:var(--warn);animation:pulse 1.4s ease-in-out infinite}
 .dot.idle{background:var(--ok)}
@@ -83,6 +94,7 @@ table.inset{margin:.6rem 0;width:auto}
   <a href="/" {{if eq .Active "index"}}class="active"{{end}}>Actionable now</a>
   <a href="/runs" {{if eq .Active "runs"}}class="active"{{end}}>Runs</a>
   <a href="/scoreboard" {{if eq .Active "scoreboard"}}class="active"{{end}}>Scoreboard</a>
+  <a href="/pnl" {{if eq .Active "pnl"}}class="active"{{end}}>P&amp;L</a>
   <a href="/signals" {{if eq .Active "signals"}}class="active"{{end}}>Signals</a>
   <a href="/info" {{if eq .Active "info"}}class="active"{{end}}>Info</a>
 </nav>
