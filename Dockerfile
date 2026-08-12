@@ -8,7 +8,7 @@ WORKDIR /src/ui
 COPY ui/package.json ui/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY ui/ ./
-RUN bun run build
+RUN bunx --bun vite build
 
 # ---- go build ----
 FROM golang:1.26-bookworm AS build
