@@ -4,7 +4,7 @@ import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 
 // one port per app — pick a unique one when cloning the template
-const PORT = 3040
+const PORT = 3041
 
 export default defineConfig({
   plugins: [vue(), tailwindcss()],
