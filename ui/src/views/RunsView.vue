@@ -65,12 +65,15 @@ onUnmounted(() => clearInterval(timer))
         <label class="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
           <Switch v-model="shippedOnly" />
           Hide empty runs
-          <span v-if="shippedOnly && hiddenCount" class="tabular-nums">({{ hiddenCount }} hidden)</span>
         </label>
         <Button variant="outline" size="sm" @click="load"><RefreshCwIcon /> Refresh</Button>
         <Button size="sm" @click="trigger"><PlayIcon /> Trigger run</Button>
       </template>
     </PageHeader>
+
+    <p class="text-xs text-muted-foreground tabular-nums">
+      showing {{ visible.length }} of {{ runs.length }} runs{{ shippedOnly && hiddenCount ? ` — ${hiddenCount} empty hidden` : '' }}
+    </p>
 
     <Table>
       <TableHeader>
