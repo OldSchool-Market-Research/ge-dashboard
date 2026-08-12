@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { MenuIcon, SparklesIcon } from '@lucide/vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
-import ThemePicker from '@/components/ThemePicker.vue'
-import ThemeToggle from '@/components/ThemeToggle.vue'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -60,8 +58,6 @@ function isActive(to: string) {
           </RouterLink>
         </nav>
         <div class="ml-auto flex items-center gap-1">
-          <ThemePicker />
-          <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" size="icon" class="md:hidden" aria-label="Open navigation">

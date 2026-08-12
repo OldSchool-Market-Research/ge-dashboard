@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import {
   Table,
   TableBody,
@@ -19,13 +20,15 @@ import { api, timeAgo, type Run } from '@/lib/api'
 const router = useRouter()
 const runs = ref<Run[]>([])
 const loading = ref(true)
-// most cron runs legitimately ship nothing — default to the ones that didn't
+// most cron runs legitimately ship nothing — default to hiding them (an
+// "empty" run succeeded and shipped zero strategies; failures always show)
 const shippedOnly = ref(true)
 const visible = computed(() =>
   shippedOnly.value
     ? runs.value.filter((r) => (r.strategy_count ?? 0) > 0 || r.status !== 'succeeded')
     : runs.value,
 )
+const hiddenCount = computed(() => runs.value.length - visible.value.length)
 
 async function load() {
   try {
@@ -59,9 +62,11 @@ onUnmounted(() => clearInterval(timer))
   <div class="space-y-6">
     <PageHeader title="Runs" description="Every research cycle: what the agent saw, shipped and dismissed.">
       <template #actions>
-        <Button :variant="shippedOnly ? 'secondary' : 'ghost'" size="sm" @click="shippedOnly = !shippedOnly">
-          shipped or failed only
-        </Button>
+        <label class="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+          <Switch v-model="shippedOnly" />
+          Hide empty runs
+          <span v-if="shippedOnly && hiddenCount" class="tabular-nums">({{ hiddenCount }} hidden)</span>
+        </label>
         <Button variant="outline" size="sm" @click="load"><RefreshCwIcon /> Refresh</Button>
         <Button size="sm" @click="trigger"><PlayIcon /> Trigger run</Button>
       </template>

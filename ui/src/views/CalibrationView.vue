@@ -15,18 +15,24 @@ import {
 import { api, type CalibrationResponse } from '@/lib/api'
 
 const cal = ref<CalibrationResponse | null>(null)
+const error = ref('')
 
 onMounted(async () => {
   try {
     cal.value = await api.calibration(30)
   } catch (e) {
+    error.value = String(e)
     toast.error(String(e))
   }
 })
 </script>
 
 <template>
-  <div v-if="cal" class="space-y-6">
+  <div v-if="error" class="rounded-md border border-destructive/40 p-4 text-sm">
+    <p class="font-medium text-destructive">calibration API unavailable</p>
+    <p class="mt-1 font-mono text-xs text-muted-foreground">{{ error }}</p>
+  </div>
+  <div v-else-if="cal" class="space-y-6">
     <PageHeader
       title="Calibration"
       description="What the record says a raw claim is worth: factor = p_survive × pace. The loop's learning curve."
