@@ -7,3 +7,8 @@ bin/
 *.exe
 *.test
 *.out
+
+# ui
+ui/node_modules/
+ui/dist/
+ui/.direnv/
