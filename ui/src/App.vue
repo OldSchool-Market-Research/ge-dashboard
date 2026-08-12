@@ -17,8 +17,9 @@ const { theme, mode } = useTheme()
 const route = useRoute()
 
 const links = [
-  { to: '/', label: 'Runs' },
+  { to: '/', label: 'Overview' },
   { to: '/book', label: 'Book' },
+  { to: '/runs', label: 'Runs' },
   { to: '/pnl', label: 'P&L' },
   { to: '/calibration', label: 'Calibration' },
   { to: '/signals', label: 'Signals' },

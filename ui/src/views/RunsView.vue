@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { PlayIcon, RefreshCwIcon } from '@lucide/vue'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
@@ -19,6 +19,13 @@ import { api, timeAgo, type Run } from '@/lib/api'
 const router = useRouter()
 const runs = ref<Run[]>([])
 const loading = ref(true)
+// most cron runs legitimately ship nothing — default to the ones that didn't
+const shippedOnly = ref(true)
+const visible = computed(() =>
+  shippedOnly.value
+    ? runs.value.filter((r) => (r.strategy_count ?? 0) > 0 || r.status !== 'succeeded')
+    : runs.value,
+)
 
 async function load() {
   try {
@@ -52,6 +59,9 @@ onUnmounted(() => clearInterval(timer))
   <div class="space-y-6">
     <PageHeader title="Runs" description="Every research cycle: what the agent saw, shipped and dismissed.">
       <template #actions>
+        <Button :variant="shippedOnly ? 'secondary' : 'ghost'" size="sm" @click="shippedOnly = !shippedOnly">
+          shipped or failed only
+        </Button>
         <Button variant="outline" size="sm" @click="load"><RefreshCwIcon /> Refresh</Button>
         <Button size="sm" @click="trigger"><PlayIcon /> Trigger run</Button>
       </template>
@@ -69,7 +79,7 @@ onUnmounted(() => clearInterval(timer))
       </TableHeader>
       <TableBody>
         <TableRow
-          v-for="r in runs"
+          v-for="r in visible"
           :key="r.run_id"
           class="cursor-pointer"
           @click="router.push(`/runs/${r.run_id}`)"
@@ -82,8 +92,10 @@ onUnmounted(() => clearInterval(timer))
             {{ r.fail_reason ?? '' }}
           </TableCell>
         </TableRow>
-        <TableRow v-if="!loading && runs.length === 0">
-          <TableCell colspan="5" class="text-center text-muted-foreground">no runs yet</TableCell>
+        <TableRow v-if="!loading && visible.length === 0">
+          <TableCell colspan="5" class="text-center text-muted-foreground">
+            {{ runs.length ? `all ${runs.length} recent runs shipped nothing (a valid outcome — see their Discarded sections)` : 'no runs yet' }}
+          </TableCell>
         </TableRow>
       </TableBody>
     </Table>
