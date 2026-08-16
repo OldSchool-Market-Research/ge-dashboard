@@ -9,7 +9,29 @@ export interface Run {
   finished_at: string | null
   status: 'running' | 'succeeded' | 'failed'
   fail_reason: string | null
-  strategy_count?: number
+  n_strategies: number
+  // why the run started; null for rows predating orchestrator migration 017
+  trigger_source: 'schedule' | 'signal' | 'empty' | 'manual' | null
+  // cost record from the agent's stats sidecar; null when absent
+  turns: number | null
+  tool_calls: number | null
+  input_tokens: number | null
+  output_tokens: number | null
+  peak_input_tokens: number | null
+  pruned_bytes: number | null
+}
+
+// Full cost sidecar (GET /api/runs/{id}/stats) — per-turn token detail.
+export interface RunStats {
+  outcome: 'submitted' | 'failed'
+  fail_reason?: string
+  turns: number
+  tool_calls: number
+  input_tokens: number
+  output_tokens: number
+  peak_input_tokens: number
+  pruned_bytes: number
+  per_turn: { turn: number; input_tokens: number; output_tokens: number; tool_calls: number }[]
 }
 
 export interface AttentionSpec {
@@ -147,6 +169,7 @@ export const api = {
   runs: (limit = 50) => get<Run[]>(`/api/runs?limit=${limit}`),
   run: (id: number | string) => get<{ run: Run; strategies: Strategy[] }>(`/api/runs/${id}`),
   reportUrl: (id: number | string) => `/api/runs/${id}/report`,
+  runStats: (id: number | string) => get<RunStats>(`/api/runs/${id}/stats`),
   report: async (id: number | string) => {
     const res = await fetch(`/api/runs/${id}/report`)
     if (!res.ok) throw new Error(`report ${id}: ${res.status}`)
@@ -188,6 +211,23 @@ export function gp(v: number | null | undefined): string {
   if (a >= 1_000_000) return `${sign}${(a / 1e6).toFixed(1)}M`
   if (a >= 10_000) return `${sign}${(a / 1e3).toFixed(0)}k`
   return `${sign}${a.toFixed(0)}`
+}
+
+// Compact token count: 1234 -> "1.2k", 2_500_000 -> "2.5M". Null stays "—"
+// (no cost record), never 0 — absence of measurement is not zero cost.
+export function tokens(v: number | null | undefined): string {
+  if (v == null) return '—'
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
+  if (v >= 1_000) return `${(v / 1_000).toFixed(v < 10_000 ? 1 : 0)}k`
+  return String(v)
+}
+
+// Run duration from its timestamps; running/unknown stays "—".
+export function duration(start: string, end: string | null | undefined): string {
+  if (!end) return '—'
+  const s = (new Date(end).getTime() - new Date(start).getTime()) / 1000
+  if (s < 90) return `${Math.round(s)}s`
+  return `${Math.round(s / 60)}m`
 }
 
 export function timeAgo(iso: string | null | undefined): string {

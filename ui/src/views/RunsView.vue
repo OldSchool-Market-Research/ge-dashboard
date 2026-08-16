@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { api, timeAgo, type Run } from '@/lib/api'
+import { api, duration, timeAgo, tokens, type Run } from '@/lib/api'
 
 const router = useRouter()
 const runs = ref<Run[]>([])
@@ -25,10 +25,22 @@ const loading = ref(true)
 const shippedOnly = ref(true)
 const visible = computed(() =>
   shippedOnly.value
-    ? runs.value.filter((r) => (r.strategy_count ?? 0) > 0 || r.status !== 'succeeded')
+    ? runs.value.filter((r) => r.n_strategies > 0 || r.status !== 'succeeded')
     : runs.value,
 )
 const hiddenCount = computed(() => runs.value.length - visible.value.length)
+// Burn across the fetched window — hidden runs burn tokens too, so the
+// totals always cover ALL fetched runs, not just the visible ones.
+const totalTokens = computed(() =>
+  runs.value.reduce((sum, r) => sum + (r.input_tokens ?? 0) + (r.output_tokens ?? 0), 0),
+)
+
+const triggerLabel: Record<string, string> = {
+  schedule: 'timer',
+  signal: 'signal',
+  empty: 'empty book',
+  manual: 'manual',
+}
 
 async function load() {
   try {
@@ -73,6 +85,7 @@ onUnmounted(() => clearInterval(timer))
 
     <p class="text-xs text-muted-foreground tabular-nums">
       showing {{ visible.length }} of {{ runs.length }} runs{{ shippedOnly && hiddenCount ? ` — ${hiddenCount} empty hidden` : '' }}
+      <template v-if="totalTokens > 0"> · {{ tokens(totalTokens) }} tokens across all {{ runs.length }}</template>
     </p>
 
     <Table>
@@ -80,7 +93,11 @@ onUnmounted(() => clearInterval(timer))
         <TableRow>
           <TableHead class="w-20">Run</TableHead>
           <TableHead>Status</TableHead>
+          <TableHead>Trigger</TableHead>
           <TableHead>Started</TableHead>
+          <TableHead class="text-right">Took</TableHead>
+          <TableHead class="text-right">Calls</TableHead>
+          <TableHead class="text-right">Tokens</TableHead>
           <TableHead class="text-right">Shipped</TableHead>
           <TableHead>Failure</TableHead>
         </TableRow>
@@ -94,14 +111,25 @@ onUnmounted(() => clearInterval(timer))
         >
           <TableCell class="font-medium tabular-nums">#{{ r.run_id }}</TableCell>
           <TableCell><StatusBadge :state="r.status" /></TableCell>
+          <TableCell class="text-xs text-muted-foreground">
+            {{ r.trigger_source ? triggerLabel[r.trigger_source] : '—' }}
+          </TableCell>
           <TableCell class="text-muted-foreground">{{ timeAgo(r.started_at) }}</TableCell>
-          <TableCell class="text-right tabular-nums">{{ r.strategy_count ?? 0 }}</TableCell>
+          <TableCell class="text-right tabular-nums text-muted-foreground">{{ duration(r.started_at, r.finished_at) }}</TableCell>
+          <TableCell class="text-right tabular-nums text-muted-foreground">{{ r.tool_calls ?? '—' }}</TableCell>
+          <TableCell
+            class="text-right tabular-nums text-muted-foreground"
+            :title="r.input_tokens != null ? `${r.input_tokens.toLocaleString()} in / ${r.output_tokens?.toLocaleString()} out` : 'no cost record'"
+          >
+            {{ r.input_tokens != null ? tokens((r.input_tokens ?? 0) + (r.output_tokens ?? 0)) : '—' }}
+          </TableCell>
+          <TableCell class="text-right tabular-nums">{{ r.n_strategies }}</TableCell>
           <TableCell class="max-w-md truncate text-xs text-muted-foreground">
             {{ r.fail_reason ?? '' }}
           </TableCell>
         </TableRow>
         <TableRow v-if="!loading && visible.length === 0">
-          <TableCell colspan="5" class="text-center text-muted-foreground">
+          <TableCell colspan="9" class="text-center text-muted-foreground">
             {{ runs.length ? `all ${runs.length} recent runs shipped nothing (a valid outcome — see their Discarded sections)` : 'no runs yet' }}
           </TableCell>
         </TableRow>
