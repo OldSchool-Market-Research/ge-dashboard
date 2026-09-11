@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build": "node node_modules/.bin/vue-tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "vue-tsc -b"
+    "typecheck": "node node_modules/.bin/vue-tsc -b"
   },
   "dependencies": {
     "@lucide/vue": "^1.25.0",

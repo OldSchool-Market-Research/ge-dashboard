@@ -15,7 +15,7 @@ let
       jfmt
       nixup
     ];
-    bun = [ bun ];
+    bun = [ bun nodejs ];
     scripts = pkgs.lib.attrsets.attrValues scripts;
   };
 

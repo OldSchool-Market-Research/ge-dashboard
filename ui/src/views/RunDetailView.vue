@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ArrowLeftIcon } from '@lucide/vue'
+import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
@@ -44,7 +45,7 @@ async function load() {
   run.value = r
   strategies.value = st ?? []
   if (r.status === 'succeeded') {
-    reportHtml.value = await marked.parse(await api.report(id))
+    reportHtml.value = DOMPurify.sanitize(await marked.parse(await api.report(id)))
   }
   if (r.status !== 'running') {
     // Cost sidecar exists for agent >= 0.10.0 runs; 404 before that is fine.
