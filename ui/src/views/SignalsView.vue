@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { toast } from 'vue-sonner'
-import PageHeader from '@/components/PageHeader.vue'
-import StatusBadge from '@/components/StatusBadge.vue'
-import { Badge } from '@/components/ui/badge'
+import { Badge } from '@fisherrjd/ui/badge'
+import { PageHeader } from '@fisherrjd/ui/layout'
 import {
   Table,
   TableBody,
@@ -11,7 +8,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from '@fisherrjd/ui/table'
+import { computed, onMounted, ref } from 'vue'
+import { toast } from 'vue-sonner'
+import StatusBadge from '@/components/StatusBadge.vue'
 import { api, gp, timeAgo, type Signal, type WatchRow } from '@/lib/api'
 
 const signals = ref<Signal[]>([])

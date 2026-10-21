@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import { Button } from '@fisherrjd/ui/button'
+import { PageHeader } from '@fisherrjd/ui/layout'
 import { RefreshCwIcon } from '@lucide/vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import PageHeader from '@/components/PageHeader.vue'
 import StatTile from '@/components/StatTile.vue'
 import StrategyCard from '@/components/StrategyCard.vue'
-import { Button } from '@/components/ui/button'
 import { api, gp, type Strategy } from '@/lib/api'
 
 const book = ref<Strategy[]>([])

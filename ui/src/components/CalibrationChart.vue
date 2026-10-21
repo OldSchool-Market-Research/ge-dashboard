@@ -3,8 +3,8 @@
 // categorical hue order — identity follows the archetype across filters),
 // legend always present, direct label at each line's end, epoch-2 cut for F
 // drawn as a reference line. Crosshair tooltip on hover.
+import { useTheme } from '@fisherrjd/ui/theme'
 import { computed, ref } from 'vue'
-import { useTheme } from '@/composables/useTheme'
 import type { CalibrationRow } from '@/lib/api'
 import { ARCHETYPE_ORDER, archetypeColor } from '@/lib/viz'
 

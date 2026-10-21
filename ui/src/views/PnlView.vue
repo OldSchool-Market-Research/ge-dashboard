@@ -1,12 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { toast } from 'vue-sonner'
-import DailyPnlChart from '@/components/DailyPnlChart.vue'
-import PageHeader from '@/components/PageHeader.vue'
-import StatTile from '@/components/StatTile.vue'
-import StatusBadge from '@/components/StatusBadge.vue'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Badge } from '@fisherrjd/ui/badge'
+import { Button } from '@fisherrjd/ui/button'
+import { PageHeader } from '@fisherrjd/ui/layout'
 import {
   Table,
   TableBody,
@@ -14,7 +9,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from '@fisherrjd/ui/table'
+import { computed, onMounted, ref } from 'vue'
+import { toast } from 'vue-sonner'
+import DailyPnlChart from '@/components/DailyPnlChart.vue'
+import StatTile from '@/components/StatTile.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
 import { api, gp, type PnLResponse } from '@/lib/api'
 
 const pnl = ref<PnLResponse | null>(null)
@@ -63,7 +63,12 @@ onMounted(async () => {
     <PageHeader title="P&L" description="Paper estimates with the self-impact haircut — an upper bound, not a ledger." />
 
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <StatTile label="Est. realized (all time)" :value="`${gp(total)} gp`" :signed="total" />
+      <StatTile
+        label="Est. realized"
+        :value="`${gp(total)} gp`"
+        :signed="total"
+        :hint="pnl.quarantined?.n ? `${pnl.quarantined.n} quarantined left out` : undefined"
+      />
       <StatTile
         v-for="a in ['F', 'C', 'B']"
         :key="a"
@@ -94,7 +99,12 @@ onMounted(async () => {
     </section>
 
     <section>
-      <h2 class="mb-2 text-sm font-medium">Per strategy (largest effect first)</h2>
+      <div class="mb-2">
+        <h2 class="text-sm font-medium">Per strategy (largest effect first)</h2>
+        <p v-if="pnl.quarantined?.n" class="mt-0.5 text-xs text-muted-foreground">
+          {{ pnl.quarantined.n }} quarantined strategies (known-bad or pre-restart numbers) are left out.
+        </p>
+      </div>
       <Table>
         <TableHeader>
           <TableRow>

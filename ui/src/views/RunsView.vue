@@ -1,12 +1,7 @@
 <script setup lang="ts">
-import { PlayIcon, RefreshCwIcon } from '@lucide/vue'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { toast } from 'vue-sonner'
-import { useRouter } from 'vue-router'
-import PageHeader from '@/components/PageHeader.vue'
-import StatusBadge from '@/components/StatusBadge.vue'
-import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
+import { Button } from '@fisherrjd/ui/button'
+import { PageHeader } from '@fisherrjd/ui/layout'
+import { Switch } from '@fisherrjd/ui/switch'
 import {
   Table,
   TableBody,
@@ -14,7 +9,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from '@fisherrjd/ui/table'
+import { PlayIcon, RefreshCwIcon } from '@lucide/vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
+import StatusBadge from '@/components/StatusBadge.vue'
 import { api, duration, timeAgo, tokens, type Run } from '@/lib/api'
 
 const router = useRouter()

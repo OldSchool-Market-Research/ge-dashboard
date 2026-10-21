@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import StatusBadge from '@/components/StatusBadge.vue'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@fisherrjd/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@fisherrjd/ui/card'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip'
+} from '@fisherrjd/ui/tooltip'
+import { computed } from 'vue'
+import StatusBadge from '@/components/StatusBadge.vue'
 import { gp, timeAgo, type Strategy } from '@/lib/api'
 
 const props = defineProps<{ strategy: Strategy }>()

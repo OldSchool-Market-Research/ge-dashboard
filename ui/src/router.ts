@@ -40,11 +40,17 @@ const router = createRouter({
       name: 'settings',
       component: () => import('./views/SettingsView.vue'),
     },
-    {
-      path: '/styleguide',
-      name: 'styleguide',
-      component: () => import('./views/styleguide/StyleguideView.vue'),
-    },
+    // dev only: the styleguide and its theme lab are a workshop, never shipped —
+    // in a build this branch is dead code, so the page isn't even bundled
+    ...(import.meta.env.DEV
+      ? [
+          {
+            path: '/styleguide',
+            name: 'styleguide',
+            component: () => import('@fisherrjd/ui/styleguide').then((m) => m.StyleguidePage),
+          },
+        ]
+      : []),
   ],
   scrollBehavior: () => ({ top: 0 }),
 })
