@@ -90,6 +90,8 @@ export interface PnLRow {
   capital_required: number | null
   eval_epoch: number
   sim_scored?: boolean
+  /** known-bad numbers (migration 016): listed by the API, counted nowhere */
+  quarantined_reason?: string
 }
 
 export interface PnLBucket {
@@ -102,6 +104,7 @@ export interface PnLResponse {
   as_of: string
   by_state: Record<string, PnLBucket>
   by_archetype: Record<string, PnLBucket>
+  quarantined: PnLBucket
   strategies: PnLRow[]
 }
 
@@ -178,7 +181,13 @@ export const api = {
   openBook: () => get<Strategy[]>('/api/strategies?scope=open&live=1'),
   strategy: (id: number | string) =>
     get<{ strategy: Strategy; evaluations: Evaluation[] }>(`/api/strategies/${id}`),
-  pnl: () => get<PnLResponse>('/api/pnl'),
+  // quarantined strategies stay in the API's list for the record; the
+  // dashboard leaves them out of every chart, list and total (the server's
+  // buckets already do)
+  pnl: async () => {
+    const res = await get<PnLResponse>('/api/pnl')
+    return { ...res, strategies: res.strategies.filter((r) => !r.quarantined_reason) }
+  },
   calibration: (days = 30) => get<CalibrationResponse>(`/api/calibration?days=${days}`),
   signals: (limit = 100) => get<Signal[]>(`/api/signals?limit=${limit}`),
   watchlist: () => get<WatchRow[]>('/api/watchlist'),
