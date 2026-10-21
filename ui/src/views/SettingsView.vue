@@ -1,24 +1,15 @@
 <script setup lang="ts">
+import { Button } from '@fisherrjd/ui/button'
+import { Input } from '@fisherrjd/ui/input'
+import { Label } from '@fisherrjd/ui/label'
+import { PageHeader } from '@fisherrjd/ui/layout'
+import { ConfirmDialog } from '@fisherrjd/ui/states'
+import { Switch } from '@fisherrjd/ui/switch'
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import PageHeader from '@/components/PageHeader.vue'
 import FormField from '@/components/forms/FormField.vue'
 import SettingsSection from '@/components/forms/SettingsSection.vue'
 import TagInput from '@/components/forms/TagInput.vue'
-import ConfirmDialog from '@/components/states/ConfirmDialog.vue'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { useTheme } from '@/composables/useTheme'
-import { THEMES, type ThemeId } from '@/lib/themes'
 
 // profile — demo state; the error clears as soon as the field is valid
 const name = ref('Jade Fisher')
@@ -30,17 +21,6 @@ const productUpdates = ref(true)
 const weeklyDigest = ref(false)
 const mentions = ref(true)
 const digestTimes = ref(['08:00', '17:30'])
-
-// appearance — wired to the real theme system, not a mock
-const { theme, mode, setTheme, toggleMode } = useTheme()
-const themeModel = computed({
-  get: () => theme.value,
-  set: (id: ThemeId) => setTheme(id),
-})
-const darkMode = computed({
-  get: () => mode.value === 'dark',
-  set: () => toggleMode(),
-})
 
 function save(what: string) {
   toast.success(`${what} saved`, { description: 'Not really — wire your backend here.' })
@@ -100,29 +80,6 @@ function save(what: string) {
       <template #footer>
         <Button @click="save('Notifications')">Save</Button>
       </template>
-    </SettingsSection>
-
-    <SettingsSection
-      title="Appearance"
-      description="These actually work — same state as the header controls."
-    >
-      <FormField v-slot="{ id }" label="Theme preset">
-        <Select v-model="themeModel">
-          <SelectTrigger :id="id" class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem v-for="t in THEMES" :key="t.id" :value="t.id">{{ t.label }}</SelectItem>
-          </SelectContent>
-        </Select>
-      </FormField>
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <Label for="appearance-dark">Dark mode</Label>
-          <p class="text-xs text-muted-foreground">Dark over light, always.</p>
-        </div>
-        <Switch id="appearance-dark" v-model="darkMode" />
-      </div>
     </SettingsSection>
 
     <SettingsSection title="Danger zone" description="Irreversible things live at the bottom.">

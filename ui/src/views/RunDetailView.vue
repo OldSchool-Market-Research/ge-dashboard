@@ -1,14 +1,6 @@
 <script setup lang="ts">
-import { ArrowLeftIcon } from '@lucide/vue'
-import DOMPurify from 'dompurify'
-import { marked } from 'marked'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import PageHeader from '@/components/PageHeader.vue'
-import StatTile from '@/components/StatTile.vue'
-import StatusBadge from '@/components/StatusBadge.vue'
-import StrategyCard from '@/components/StrategyCard.vue'
-import { Button } from '@/components/ui/button'
+import { Button } from '@fisherrjd/ui/button'
+import { PageHeader } from '@fisherrjd/ui/layout'
 import {
   Table,
   TableBody,
@@ -16,8 +8,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+} from '@fisherrjd/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@fisherrjd/ui/tabs'
+import { ArrowLeftIcon } from '@lucide/vue'
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import StatTile from '@/components/StatTile.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
+import StrategyCard from '@/components/StrategyCard.vue'
 import { api, duration, timeAgo, tokens, type Run, type RunStats, type Strategy } from '@/lib/api'
 
 const route = useRoute()
@@ -111,7 +111,7 @@ onUnmounted(() => es?.close())
       <TabsContent value="report">
         <article
           v-if="reportHtml"
-          class="prose prose-sm dark:prose-invert max-w-none [&_table]:block [&_table]:overflow-x-auto"
+          class="md-prose max-w-none [&_table]:block [&_table]:overflow-x-auto"
           v-html="reportHtml"
         />
         <p v-else class="text-sm text-muted-foreground">no report (run {{ run.status }})</p>

@@ -1,13 +1,13 @@
 <script setup lang="ts">
+import { Badge } from '@fisherrjd/ui/badge'
+import { Button } from '@fisherrjd/ui/button'
+import { PageHeader } from '@fisherrjd/ui/layout'
 import { ActivityIcon, ArrowRightIcon } from '@lucide/vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import DailyPnlChart from '@/components/DailyPnlChart.vue'
-import PageHeader from '@/components/PageHeader.vue'
 import StatTile from '@/components/StatTile.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { api, gp, timeAgo, type Health, type PnLResponse, type Signal, type Strategy } from '@/lib/api'
 
 const pnl = ref<PnLResponse | null>(null)
@@ -107,7 +107,7 @@ onUnmounted(() => clearInterval(timer))
     </section>
 
     <div class="grid gap-6 lg:grid-cols-2">
-      <section>
+      <section class="min-w-0">
         <div class="mb-2 flex items-center justify-between">
           <h2 class="text-sm font-medium">Latest ships</h2>
           <Button variant="ghost" size="sm" as-child>
@@ -125,7 +125,7 @@ onUnmounted(() => clearInterval(timer))
         </ul>
       </section>
 
-      <section>
+      <section class="min-w-0">
         <div class="mb-2 flex items-center justify-between">
           <h2 class="text-sm font-medium">Latest closes</h2>
           <Button variant="ghost" size="sm" as-child>

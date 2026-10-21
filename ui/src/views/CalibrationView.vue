@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { toast } from 'vue-sonner'
-import CalibrationChart from '@/components/CalibrationChart.vue'
-import PageHeader from '@/components/PageHeader.vue'
-import StatTile from '@/components/StatTile.vue'
+import { PageHeader } from '@fisherrjd/ui/layout'
 import {
   Table,
   TableBody,
@@ -11,7 +7,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from '@fisherrjd/ui/table'
+import { onMounted, ref } from 'vue'
+import { toast } from 'vue-sonner'
+import CalibrationChart from '@/components/CalibrationChart.vue'
+import StatTile from '@/components/StatTile.vue'
 import { api, type CalibrationResponse } from '@/lib/api'
 
 const cal = ref<CalibrationResponse | null>(null)

@@ -1,17 +1,14 @@
 <script setup lang="ts">
 // Signed daily paper P&L: bars from a zero baseline, diverging pair
-// (blue = made gp, red = lost gp — poles from the validated palette; the
-// neutral midpoint is the surface). Marks per the dataviz spec: baseline-
+// (chart color = made gp, danger = lost gp, from the theme; the neutral
+// midpoint is the surface). Marks per the dataviz spec: baseline-
 // anchored bars with a rounded data-end, 2px gaps, recessive grid, per-bar
 // hover tooltip. One series — the title names it, no legend box.
 import { computed, ref } from 'vue'
-import { useTheme } from '@/composables/useTheme'
 import { gp } from '@/lib/api'
 import { DIVERGING } from '@/lib/viz'
 
 const props = defineProps<{ days: { day: string; gp: number; n: number }[] }>()
-const { mode } = useTheme()
-const pair = computed(() => (mode.value === 'dark' ? DIVERGING.dark : DIVERGING.light))
 
 const W = 720
 const H = 220
@@ -82,7 +79,7 @@ const ticks = computed(() => {
       </g>
       <!-- bars -->
       <g v-for="(d, i) in days" :key="d.day">
-        <path :d="barPath(i, d.gp)" :fill="d.gp >= 0 ? pair.pos : pair.neg" />
+        <path :d="barPath(i, d.gp)" :style="{ fill: d.gp >= 0 ? DIVERGING.pos : DIVERGING.neg }" />
         <!-- hit target wider than the mark -->
         <rect
           :x="scale.x(i) - 2"

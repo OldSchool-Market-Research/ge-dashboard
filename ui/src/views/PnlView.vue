@@ -1,12 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { toast } from 'vue-sonner'
-import DailyPnlChart from '@/components/DailyPnlChart.vue'
-import PageHeader from '@/components/PageHeader.vue'
-import StatTile from '@/components/StatTile.vue'
-import StatusBadge from '@/components/StatusBadge.vue'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Badge } from '@fisherrjd/ui/badge'
+import { Button } from '@fisherrjd/ui/button'
+import { PageHeader } from '@fisherrjd/ui/layout'
 import {
   Table,
   TableBody,
@@ -14,7 +9,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from '@fisherrjd/ui/table'
+import { computed, onMounted, ref } from 'vue'
+import { toast } from 'vue-sonner'
+import DailyPnlChart from '@/components/DailyPnlChart.vue'
+import StatTile from '@/components/StatTile.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
 import { api, gp, type PnLResponse } from '@/lib/api'
 
 const pnl = ref<PnLResponse | null>(null)
