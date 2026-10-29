@@ -12,8 +12,10 @@ import { useRoute } from 'vue-router'
 import ItemIcon from '@/components/ItemIcon.vue'
 import ItemPriceChart from '@/components/ItemPriceChart.vue'
 import StatTile from '@/components/StatTile.vue'
+import UpdatedAgo from '@/components/UpdatedAgo.vue'
 import VolumeBars from '@/components/VolumeBars.vue'
 import { api, errorText, gp, timeAgo, type ItemDetail, type ItemHistoryPoint } from '@/lib/api'
+import { useAutoRefresh } from '@/lib/autoRefresh'
 
 const route = useRoute()
 const id = route.params.id as string
@@ -38,11 +40,17 @@ async function loadHistory() {
   if (mine === seq) history.value = pts
 }
 
+async function fetchAll() {
+  item.value = await api.item(id)
+  await loadHistory()
+}
+const { updatedAt, refreshError, markUpdated } = useAutoRefresh(fetchAll)
+
 async function load() {
   error.value = null
   try {
-    item.value = await api.item(id)
-    await loadHistory()
+    await fetchAll()
+    markUpdated()
   } catch (e) {
     error.value = errorText(e, 'There is no item with this id.')
   }
@@ -65,6 +73,7 @@ onMounted(load)
         <ItemIcon :icon="item.icon" />
         <PageHeader :title="item.name" :description="item.examine ?? ''" />
         <Badge v-if="item.members !== null" variant="outline" class="ml-auto">{{ item.members ? 'Members' : 'F2P' }}</Badge>
+        <UpdatedAgo :updated-at="updatedAt" :error="refreshError" />
         <a :href="wikiUrl" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           Wiki <ExternalLinkIcon class="size-3" />
         </a>

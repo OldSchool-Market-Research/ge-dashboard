@@ -19,7 +19,9 @@ import { ArrowDownIcon, ArrowUpIcon } from '@lucide/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import ItemIcon from '@/components/ItemIcon.vue'
+import UpdatedAgo from '@/components/UpdatedAgo.vue'
 import { api, errorText, gp, timeAgo, type ItemRow } from '@/lib/api'
+import { useAutoRefresh } from '@/lib/autoRefresh'
 
 const router = useRouter()
 const items = ref<ItemRow[] | null>(null)
@@ -86,10 +88,16 @@ function setSort(k: SortKey) {
 
 watch([search, membership, minVolume, sortKey, sortDir], () => (shown.value = PAGE))
 
+// search, filters, sort and paging are untouched by a refresh: only the data moves
+const { updatedAt, refreshError, markUpdated } = useAutoRefresh(async () => {
+  items.value = await api.items()
+})
+
 async function load() {
   error.value = null
   try {
     items.value = await api.items()
+    markUpdated()
   } catch (e) {
     error.value = errorText(e)
   }
@@ -136,6 +144,7 @@ onMounted(load)
           </Button>
         </div>
         <span class="ml-auto font-mono text-xs text-muted-foreground">{{ rows.length.toLocaleString() }} items</span>
+        <UpdatedAgo :updated-at="updatedAt" :error="refreshError" />
       </div>
 
       <Table>

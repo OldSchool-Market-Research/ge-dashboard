@@ -23,7 +23,9 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import ItemIcon from '@/components/ItemIcon.vue'
 import StatTile from '@/components/StatTile.vue'
+import UpdatedAgo from '@/components/UpdatedAgo.vue'
 import { api, errorText, gp, type ProcessQuote, type ProcessTopRow } from '@/lib/api'
+import { useAutoRefresh } from '@/lib/autoRefresh'
 import { activeTime, bindingRate, perWindow, throughputLabel } from '@/lib/process'
 
 const router = useRouter()
@@ -117,11 +119,18 @@ async function loadTop() {
   if (seq === topSeq) top.value = rows
 }
 
+async function fetchAll() {
+  const [q] = await Promise.all([api.process(), loadTop()])
+  quotes.value = q
+}
+// filters, sort and basis are untouched by a refresh: only the data moves
+const { updatedAt, refreshError, markUpdated } = useAutoRefresh(fetchAll)
+
 async function load() {
   error.value = null
   try {
-    const [q] = await Promise.all([api.process(), loadTop()])
-    quotes.value = q
+    await fetchAll()
+    markUpdated()
   } catch (e) {
     error.value = errorText(e)
   }
@@ -189,6 +198,7 @@ onMounted(load)
             Profitable only
           </Button>
           <span class="ml-auto font-mono text-xs text-muted-foreground">{{ rows.length }} shown</span>
+          <UpdatedAgo :updated-at="updatedAt" :error="refreshError" />
         </div>
 
         <Table>
