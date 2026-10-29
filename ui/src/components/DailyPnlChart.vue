@@ -8,9 +8,10 @@ import { computed, ref } from 'vue'
 import { gp } from '@/lib/api'
 import { DIVERGING } from '@/lib/viz'
 
-const props = defineProps<{ days: { day: string; gp: number; n: number }[] }>()
+const props = withDefaults(defineProps<{ days: { day: string; gp: number; n: number }[]; width?: number }>(), { width: 720 })
 
-const W = 720
+// viewBox width: smaller in narrow columns keeps the labels legible
+const W = props.width
 const H = 220
 const PAD = { l: 44, r: 8, t: 10, b: 22 }
 

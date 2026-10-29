@@ -21,6 +21,11 @@ const router = createRouter({
       component: () => import('./views/BookView.vue'),
     },
     {
+      path: '/book/:id',
+      name: 'strategy',
+      component: () => import('./views/StrategyView.vue'),
+    },
+    {
       path: '/pnl',
       name: 'pnl',
       component: () => import('./views/PnlView.vue'),

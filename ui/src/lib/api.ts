@@ -19,6 +19,24 @@ export interface Run {
   output_tokens: number | null
   peak_input_tokens: number | null
   pruned_bytes: number | null
+  // orchestrator 0.17+: what the run shipped (any state, vetoed included),
+  // and a failed run's reason sorted into a kind (detail: the rejected field,
+  // the tool name, ...). Optional so an older orchestrator still renders.
+  shipped?: ShippedStrategy[]
+  fail_kind?: FailKind
+  fail_detail?: string
+}
+
+export type FailKind = 'rejected' | 'max_turns' | 'max_tokens' | 'restart' | 'tool_error' | 'other'
+
+export interface ShippedStrategy {
+  strategy_id: number
+  archetype: string
+  title: string
+  state: Strategy['state']
+  primary_item_id: number | null
+  primary_item_name: string | null
+  icon: string | null
 }
 
 // Full cost sidecar (GET /api/runs/{id}/stats) — per-turn token detail.
@@ -48,8 +66,8 @@ export interface Strategy {
   thesis: string
   items: { name: string; id: number }[]
   primary_item_id: number
-  entry_text: string
-  exit_text: string
+  entry: string
+  exit: string
   entry_price: number
   exit_price: number
   kill_price: number | null
@@ -73,6 +91,25 @@ export interface Strategy {
   // live=1 extras
   live_checks?: Record<string, boolean>
   live_verdict?: string
+  live?: Evaluation
+  // orchestrator 0.17+ (list endpoint): item id -> /mapping icon file, the
+  // newest 30 evaluations oldest first, verdict tallies over all of them,
+  // and the newest stored evaluation in full
+  item_icons?: Record<string, string>
+  trail?: TrailPoint[]
+  verdict_counts?: Record<string, number>
+  n_evals?: number
+  last_eval?: Evaluation | null
+}
+
+export interface TrailPoint {
+  at: string
+  cur_margin: number | null
+  // C lane: the post-tax conversion margin (cur_margin is the primary
+  // item's own spread there); null for other kinds
+  combo_margin?: number | null
+  verdict: Verdict
+  realized_per_1h_gp: number | null
 }
 
 export interface PnLRow {
@@ -92,6 +129,11 @@ export interface PnLRow {
   sim_scored?: boolean
   /** known-bad numbers (migration 016): listed by the API, counted nowhere */
   quarantined_reason?: string
+  // orchestrator 0.17+
+  run_id?: number
+  primary_item_id?: number | null
+  primary_item_name?: string | null
+  icon?: string | null
 }
 
 export interface PnLBucket {
@@ -317,8 +359,11 @@ export const api = {
     return res.text()
   },
   openBook: () => get<Strategy[]>('/api/strategies?scope=open&live=1'),
+  // newest first, up to 600
   strategy: (id: number | string) =>
-    get<{ strategy: Strategy; evaluations: Evaluation[] }>(`/api/strategies/${id}`),
+    get<{ strategy: Strategy; evaluations: Evaluation[]; item_icons?: Record<string, string> }>(
+      `/api/strategies/${id}`,
+    ),
   // quarantined strategies stay in the API's list for the record; the
   // dashboard leaves them out of every chart, list and total (the server's
   // buckets already do)
@@ -348,14 +393,29 @@ export const api = {
   },
 }
 
+export type Verdict = 'healthy' | 'degraded' | 'kill_signal'
+
 export interface Evaluation {
   at: string
   cur_high: number | null
   cur_low: number | null
+  high_age_s?: number | null
+  low_age_s?: number | null
   cur_margin: number | null
+  vol_30m?: number | null
   realized_per_1h_gp: number | null
-  verdict: 'healthy' | 'degraded' | 'kill_signal'
+  verdict: Verdict
   checks: Record<string, boolean>
+  detail?: EvalDetail | null
+}
+
+// The evaluator's working (C lane carries per-leg prices and the margin the
+// strategy shipped with). Every field is optional: kinds differ.
+export interface EvalDetail {
+  legs?: { item_id: number; name: string; side: 'buy' | 'sell'; qty: number; price: number | null; age_s: number | null; vol_30m: number | null }[]
+  projected_margin?: number
+  combo_margin_now?: number
+  cal_factor?: number
 }
 
 // gp renders an amount the way a player reads one: 1.2M, 470k, 987.
@@ -364,6 +424,7 @@ export function gp(v: number | null | undefined): string {
   if (v === null || v === undefined) return '—'
   const sign = v < 0 ? '-' : ''
   const a = Math.abs(v)
+  if (a >= 1_000_000_000) return `${sign}${(a / 1e9).toFixed(1)}B`
   if (a >= 10_000_000) return `${sign}${(a / 1e6).toFixed(0)}M`
   if (a >= 1_000_000) return `${sign}${(a / 1e6).toFixed(1)}M`
   if (a >= 10_000) return `${sign}${(a / 1e3).toFixed(0)}k`
