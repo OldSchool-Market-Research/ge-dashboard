@@ -22,7 +22,7 @@ import { ArrowDownIcon, ArrowUpIcon, HistoryIcon } from '@lucide/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import StatTile from '@/components/StatTile.vue'
-import { api, gp, type ProcessQuote, type ProcessTopRow } from '@/lib/api'
+import { api, errorText, gp, type ProcessQuote, type ProcessTopRow } from '@/lib/api'
 import { bindingRate, throughputLabel } from '@/lib/process'
 
 const router = useRouter()
@@ -104,8 +104,12 @@ function trend(r: ProcessTopRow): 'up' | 'down' | null {
   return d > 0.1 ? 'up' : d < -0.1 ? 'down' : null
 }
 
+// only the latest request may land: fast Slow/Insta toggles can resolve out of order
+let topSeq = 0
 async function loadTop() {
-  top.value = await api.processTop(7, 15, basis.value === 'slow' ? 'gp_hr' : 'gp_hr_insta')
+  const seq = ++topSeq
+  const rows = await api.processTop(7, 15, basis.value === 'slow' ? 'gp_hr' : 'gp_hr_insta')
+  if (seq === topSeq) top.value = rows
 }
 
 async function load() {
@@ -114,11 +118,11 @@ async function load() {
     const [q] = await Promise.all([api.process(), loadTop()])
     quotes.value = q
   } catch (e) {
-    error.value = String(e)
+    error.value = errorText(e)
   }
 }
 
-watch(basis, () => loadTop().catch((e) => (error.value = String(e))))
+watch(basis, () => loadTop().catch((e) => (error.value = errorText(e))))
 onMounted(load)
 </script>
 
@@ -132,7 +136,7 @@ onMounted(load)
     <ErrorState
       v-if="error"
       title="Processing data unavailable"
-      :description="error.includes('503') ? 'The processing schema isn\'t applied to the database yet (ge-data init/04-06).' : error"
+      :description="error"
       @retry="load"
     />
 
@@ -278,8 +282,8 @@ onMounted(load)
               <TableCell class="text-right tabular-nums">{{ gp(r.p25) }}</TableCell>
               <TableCell class="text-right tabular-nums">
                 {{ r.pct_hours_positive === null ? '—' : `${r.pct_hours_positive}%` }}
-                <Badge v-if="r.priced_hours < r.hours" variant="outline" class="ml-1 text-[10px]">
-                  {{ r.hours - r.priced_hours }}h unpriced
+                <Badge v-if="r.metric_hours < r.hours" variant="outline" class="ml-1 text-[10px]">
+                  {{ r.hours - r.metric_hours }}h unpriced
                 </Badge>
               </TableCell>
               <TableCell class="text-right tabular-nums">{{ r.hours_in_top10 }} / {{ r.hours }}</TableCell>

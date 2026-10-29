@@ -20,7 +20,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import ProcessHistoryChart from '@/components/ProcessHistoryChart.vue'
 import StatTile from '@/components/StatTile.vue'
-import { api, gp, type ProcessDetail, type ProcessHistoryPoint, type ProcessQuote } from '@/lib/api'
+import { api, errorText, gp, type ProcessDetail, type ProcessHistoryPoint, type ProcessQuote } from '@/lib/api'
 import { bindingRate, throughputLabel } from '@/lib/process'
 
 const route = useRoute()
@@ -84,11 +84,11 @@ async function load() {
     detail.value = await api.processDetail(id)
     await loadHistory()
   } catch (e) {
-    error.value = String(e)
+    error.value = errorText(e, 'There is no processing recipe with this id.')
   }
 }
 
-watch(days, () => loadHistory().catch((e) => (error.value = String(e))))
+watch(days, () => loadHistory().catch((e) => (error.value = errorText(e))))
 onMounted(load)
 </script>
 
@@ -101,7 +101,7 @@ onMounted(load)
     <ErrorState
       v-if="error"
       title="Couldn't load this recipe"
-      :description="error.includes('503') ? 'The processing schema isn\'t applied to the database yet (ge-data init/04-06).' : error.includes('404') ? 'There is no processing recipe with this id.' : error"
+      :description="error"
       @retry="load"
     />
 

@@ -36,7 +36,8 @@ const domain = computed(() => {
 
 // round the y-range out to 1/2/5 x 10^k steps so tick labels are readable
 function niceRange(lo: number, hi: number) {
-  const raw = (hi - lo) / 3
+  // gp values are integers: a step under 1 would print duplicate tick labels
+  const raw = Math.max((hi - lo) / 3, 1)
   const mag = 10 ** Math.floor(Math.log10(raw))
   const step = [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? 10 * mag
   return { lo: Math.floor(lo / step) * step, hi: Math.ceil(hi / step) * step, step }

@@ -240,10 +240,30 @@ export interface ProcessTopRow {
   avg_last_24h: number | null
 }
 
+// ApiError keeps the HTTP status so a view can branch on it (503 = the
+// processing schema isn't applied yet) without string-matching a message
+// that also contains the URL.
+export class ApiError extends Error {
+  status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path)
-  if (!res.ok) throw new Error(`${path}: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw new ApiError(res.status, `${path}: ${res.status} ${await res.text()}`)
   return res.json() as Promise<T>
+}
+
+// errorText turns a failed request into what a person should read.
+export function errorText(e: unknown, notFound = 'Not found.'): string {
+  if (e instanceof ApiError && e.status === 503) {
+    return "The processing schema isn't applied to the database yet (ge-data init/04-06)."
+  }
+  if (e instanceof ApiError && e.status === 404) return notFound
+  return String(e)
 }
 
 export const api = {
