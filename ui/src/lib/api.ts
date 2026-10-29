@@ -190,6 +190,8 @@ export interface ProcessQuote {
   // buy legs with an unknown GE limit: the limit cap skips them (optimistic)
   unknown_limit_legs: number
   max_leg_age_s: number | null
+  // main output's /mapping icon file (display only)
+  icon: string | null
 }
 
 export interface ProcessLeg {
@@ -203,6 +205,7 @@ export interface ProcessLeg {
   price_insta: number | null
   slow_age_s: number | null
   fill_volume_24h: number | null
+  icon: string | null
 }
 
 export interface ProcessDetail {

@@ -22,3 +22,24 @@ export function bindingRate(q: ProcessQuote, basis: 'slow' | 'insta' = 'slow'): 
   if (near(q.actions_per_hour)) return 'player speed'
   return null
 }
+
+// GE buy limits reset every 4 hours. Every cap in the quote view (player
+// speed, buy limit, market volume) scales with time, so one window yields
+// exactly 4 x gp/hr: a unit change, not new math.
+export const WINDOW_HOURS = 4
+
+export function perWindow(gpHr: number | null): number | null {
+  return gpHr === null ? null : gpHr * WINDOW_HOURS
+}
+
+// Roughly how much clicking one window's actions take at the recipe's
+// player speed. Null when there's no player-speed figure (market-bound NPC
+// exchanges, unknown rates): their time per window isn't tracked.
+export function activeTime(q: ProcessQuote, basis: 'slow' | 'insta' = 'slow'): string | null {
+  const eff = basis === 'slow' ? q.effective_actions_per_hour : q.effective_actions_per_hour_insta
+  if (eff === null || !q.actions_per_hour) return null
+  const minutes = ((eff * WINDOW_HOURS) / q.actions_per_hour) * 60
+  if (minutes < 1) return '<1m'
+  if (minutes < 90) return `${Math.round(minutes)}m`
+  return `${(minutes / 60).toFixed(1)}h`
+}
