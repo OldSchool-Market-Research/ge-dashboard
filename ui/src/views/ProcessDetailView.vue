@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // One processing recipe: its live quote, the legs that make it up (where
 // the cost, the cap and the stale prices are), the curation notes, and its
-// gp/hr history from the hourly snapshots.
+// history from the hourly snapshots (gp/hr, or margin when it has no rate).
 import { Badge } from '@fisherrjd/ui/badge'
 import { Button } from '@fisherrjd/ui/button'
 import { Card, CardContent } from '@fisherrjd/ui/card'
@@ -20,7 +20,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import ProcessHistoryChart from '@/components/ProcessHistoryChart.vue'
 import StatTile from '@/components/StatTile.vue'
-import { api, gp, type ProcessDetail, type ProcessHistoryPoint } from '@/lib/api'
+import { api, gp, type ProcessDetail, type ProcessHistoryPoint, type ProcessQuote } from '@/lib/api'
 import { bindingRate, throughputLabel } from '@/lib/process'
 
 const route = useRoute()
@@ -30,10 +30,34 @@ const detail = ref<ProcessDetail | null>(null)
 const history = ref<ProcessHistoryPoint[]>([])
 const error = ref<string | null>(null)
 const days = ref<1 | 7 | 30>(7)
+// 1h buckets up to a week; 6h beyond keeps the chart readable (and under
+// the API's 400-point cap)
+const bucketHours = computed(() => (days.value > 7 ? 6 : 1))
 
 const q = computed(() => detail.value?.quote)
 const buys = computed(() => detail.value?.legs.filter((l) => l.side === 'buy') ?? [])
 const sells = computed(() => detail.value?.legs.filter((l) => l.side === 'sell') ?? [])
+// no rate means no gp/hr anywhere in history: chart the margin instead
+const chartMetric = computed<'gp_hr' | 'margin_slow'>(() =>
+  history.value.some((p) => p.gp_hr !== null) ? 'gp_hr' : 'margin_slow',
+)
+const hasHistory = computed(() => history.value.some((p) => p[chartMetric.value] !== null))
+
+const rateSource = computed(() => {
+  const r = q.value
+  if (!r) return ''
+  if (r.throughput === 'unknown') return 'rate unknown'
+  if (r.throughput === 'volume_bound') return 'rate source: market volume and buy limits'
+  return `rate source: ${throughputLabel[r.throughput]} (${r.actions_per_hour?.toLocaleString()}/hr), capped by limits and volume`
+})
+
+// why a gp/hr tile is empty, or which ceiling sets it
+function gpHint(r: ProcessQuote, basis: 'slow' | 'insta') {
+  const missing = basis === 'slow' ? r.missing_legs : r.missing_legs_insta
+  if (missing > 0) return `${missing} leg${missing === 1 ? '' : 's'} unpriced`
+  if (r.throughput === 'unknown') return 'no rate: judge it on margin'
+  return bindingRate(r, basis) ?? undefined
+}
 
 function age(s: number | null) {
   if (s === null) return '—'
@@ -41,13 +65,17 @@ function age(s: number | null) {
   if (s < 172800) return `${Math.round(s / 3600)}h`
   return `${Math.round(s / 86400)}d`
 }
-function qty(n: number) {
+function qty(n: number | null) {
+  if (n === null) return '—'
   return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 4 })
 }
 
+// only the latest request may land: fast 1d -> 30d clicks can resolve out of order
+let historySeq = 0
 async function loadHistory() {
-  // 1h buckets up to a week; daily-ish detail beyond that keeps the chart readable
-  history.value = await api.processHistory(id, days.value, days.value > 7 ? '6h' : '1h')
+  const seq = ++historySeq
+  const pts = await api.processHistory(id, days.value, bucketHours.value === 6 ? '6h' : '1h')
+  if (seq === historySeq) history.value = pts
 }
 
 async function load() {
@@ -70,16 +98,21 @@ onMounted(load)
       <RouterLink to="/process"><ArrowLeftIcon class="size-4" /> Processing</RouterLink>
     </Button>
 
-    <ErrorState v-if="error" title="Couldn't load this recipe" :description="error" @retry="load" />
+    <ErrorState
+      v-if="error"
+      title="Couldn't load this recipe"
+      :description="error.includes('503') ? 'The processing schema isn\'t applied to the database yet (ge-data init/04-06).' : error.includes('404') ? 'There is no processing recipe with this id.' : error"
+      @retry="load"
+    />
 
     <template v-else-if="detail && q">
-      <PageHeader :title="q.name" :description="`${q.category} · ${throughputLabel[q.throughput]}`" />
+      <PageHeader :title="q.name" :description="`${q.category} · ${rateSource}`" />
 
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="gp/hr (slow)" :value="gp(q.gp_hr)" :signed="q.gp_hr" :hint="bindingRate(q) ?? undefined" />
-        <StatTile label="gp/hr (insta)" :value="gp(q.gp_hr_insta)" :signed="q.gp_hr_insta" :hint="bindingRate(q, 'insta') ?? undefined" />
+        <StatTile label="gp/hr (slow)" :value="gp(q.gp_hr)" :signed="q.gp_hr" :hint="gpHint(q, 'slow')" />
+        <StatTile label="gp/hr (insta)" :value="gp(q.gp_hr_insta)" :signed="q.gp_hr_insta" :hint="gpHint(q, 'insta')" />
         <StatTile
-          label="Margin / action"
+          label="Margin / action (slow)"
           :value="gp(q.margin_slow)"
           :hint="q.fee_gp ? `after ${gp(q.fee_gp)} fee; insta ${gp(q.margin_insta)}` : `insta ${gp(q.margin_insta)}`"
         />
@@ -106,24 +139,26 @@ onMounted(load)
 
       <section>
         <div class="mb-2 flex items-center justify-between">
-          <h2 class="text-sm font-medium">gp/hr history (slow)</h2>
+          <h2 class="text-sm font-medium">{{ chartMetric === 'gp_hr' ? 'gp/hr history (slow)' : 'Margin per action history (slow)' }}</h2>
           <!-- filters in one row above the chart -->
-          <div class="flex gap-1">
-            <Button v-for="d in [1, 7, 30] as const" :key="d" :variant="days === d ? 'secondary' : 'ghost'" size="sm" @click="days = d">
+          <div class="flex gap-1" role="group" aria-label="History range">
+            <Button
+              v-for="d in [1, 7, 30] as const"
+              :key="d"
+              :variant="days === d ? 'secondary' : 'ghost'"
+              size="sm"
+              :aria-pressed="days === d"
+              @click="days = d"
+            >
               {{ d }}d
             </Button>
           </div>
         </div>
-        <ProcessHistoryChart v-if="history.some((p) => p.gp_hr !== null)" :points="history" />
-        <EmptyState
-          v-else
-          :icon="HistoryIcon"
-          title="No priced history yet"
-          :description="q.throughput === 'unknown' ? 'This recipe has no rate, so it has no gp/hr; its margin is tracked.' : 'The ingester snapshots every recipe once an hour.'"
-        />
+        <ProcessHistoryChart v-if="hasHistory" :points="history" :metric="chartMetric" :days="days" :bucket-hours="bucketHours" />
+        <EmptyState v-else :icon="HistoryIcon" title="No priced history yet" description="The ingester snapshots every recipe once an hour." />
       </section>
 
-      <section v-for="[label, legs] in [['Inputs (bought)', buys], ['Outputs (sold)', sells]] as const" :key="label">
+      <section v-for="[label, rows] in [['Inputs (bought)', buys], ['Outputs (sold)', sells]] as const" :key="label">
         <h2 class="mb-2 text-sm font-medium">{{ label }}</h2>
         <Table>
           <TableHeader>
@@ -134,14 +169,14 @@ onMounted(load)
               <TableHead class="text-right">Insta price</TableHead>
               <TableHead class="text-right">Buy limit</TableHead>
               <TableHead class="text-right">24h fill volume</TableHead>
-              <TableHead class="text-right">Price age</TableHead>
+              <TableHead class="text-right">Slow price age</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow v-for="l in legs" :key="l.item_id">
+            <TableRow v-for="(l, i) in rows" :key="l.item_id ?? `leg-${i}`">
               <TableCell>
-                <span class="font-medium">{{ l.name ?? `item ${l.item_id}` }}</span>
-                <span class="ml-1 font-mono text-xs text-muted-foreground">{{ l.item_id }}</span>
+                <span class="font-medium">{{ l.name ?? (l.item_id === null ? 'malformed leg' : `item ${l.item_id}`) }}</span>
+                <span v-if="l.item_id !== null" class="ml-1 font-mono text-xs text-muted-foreground">{{ l.item_id }}</span>
               </TableCell>
               <TableCell class="text-right tabular-nums">{{ qty(l.qty) }}</TableCell>
               <TableCell class="text-right tabular-nums">

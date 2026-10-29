@@ -194,9 +194,10 @@ export interface ProcessQuote {
 
 export interface ProcessLeg {
   side: 'buy' | 'sell'
-  item_id: number
+  // null when the recipe's leg is malformed (the recipe is then unpriceable)
+  item_id: number | null
   name: string | null
-  qty: number
+  qty: number | null
   buy_limit: number | null
   price_slow: number | null
   price_insta: number | null
@@ -271,7 +272,8 @@ export const api = {
   watchlist: () => get<WatchRow[]>('/api/watchlist'),
   briefPreview: () => get<{ brief_text: string }>('/api/brief/preview'),
   process: () => get<ProcessQuote[]>('/api/process'),
-  processTop: (days = 7, limit = 20) => get<ProcessTopRow[]>(`/api/process/top?days=${days}&limit=${limit}`),
+  processTop: (days = 7, limit = 20, metric: 'gp_hr' | 'gp_hr_insta' = 'gp_hr') =>
+    get<ProcessTopRow[]>(`/api/process/top?days=${days}&limit=${limit}&metric=${metric}`),
   processDetail: (id: number | string) => get<ProcessDetail>(`/api/process/${id}`),
   processHistory: (id: number | string, days = 7, bucket: '1h' | '6h' | '1d' = '1h') =>
     get<ProcessHistoryPoint[]>(`/api/process/${id}/history?days=${days}&bucket=${bucket}`),
