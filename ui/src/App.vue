@@ -4,6 +4,7 @@ import {
   BookOpenIcon,
   CoinsIcon,
   CrosshairIcon,
+  FactoryIcon,
   FlaskConicalIcon,
   LayoutDashboardIcon,
   PaletteIcon,
@@ -24,6 +25,10 @@ const nav: NavSection[] = [
       { to: '/calibration', label: 'Calibration', icon: CrosshairIcon },
       { to: '/signals', label: 'Signals', icon: RadioIcon },
     ],
+  },
+  {
+    label: 'Market',
+    links: [{ to: '/process', label: 'Processing', icon: FactoryIcon }],
   },
   {
     label: 'App',

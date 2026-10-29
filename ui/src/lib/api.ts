@@ -161,6 +161,84 @@ export interface Health {
   active_run_id: number | null
 }
 
+// Processing recipes (GET /api/process*): player-time money-makers ranked by
+// gp/hr. Every number is computed by ge-data's process_quotes_now view, the
+// same source as the agent's process_* tools. A null margin is an
+// unpriceable leg (nothing traded that side), never zero.
+export type Throughput = 'fixed' | 'volume_capped' | 'volume_bound' | 'unknown'
+
+export interface ProcessQuote {
+  recipe_id: number
+  name: string
+  category: string
+  throughput: Throughput
+  margin_slow: number | null
+  margin_insta: number | null
+  gp_hr: number | null
+  gp_hr_insta: number | null
+  gp_hr_theoretical: number | null
+  actions_per_hour: number | null
+  effective_actions_per_hour: number | null
+  limit_actions_per_hour: number | null
+  market_actions_per_hour: number | null
+  // insta orders fill against the other side of the book
+  effective_actions_per_hour_insta: number | null
+  market_actions_per_hour_insta: number | null
+  fee_gp: number
+  missing_legs: number
+  missing_legs_insta: number
+  // buy legs with an unknown GE limit: the limit cap skips them (optimistic)
+  unknown_limit_legs: number
+  max_leg_age_s: number | null
+}
+
+export interface ProcessLeg {
+  side: 'buy' | 'sell'
+  item_id: number
+  name: string | null
+  qty: number
+  buy_limit: number | null
+  price_slow: number | null
+  price_insta: number | null
+  slow_age_s: number | null
+  fill_volume_24h: number | null
+}
+
+export interface ProcessDetail {
+  quote: ProcessQuote
+  source: string
+  relation_name: string | null
+  relation_direction: 'forward' | 'reverse' | null
+  notes: string | null
+  legs: ProcessLeg[]
+}
+
+export interface ProcessHistoryPoint {
+  bucket: string
+  margin_slow: number | null
+  margin_insta: number | null
+  gp_hr: number | null
+  gp_hr_insta: number | null
+  effective_actions_per_hour: number | null
+  hours: number
+  priced_hours: number
+}
+
+export interface ProcessTopRow {
+  recipe_id: number
+  name: string
+  category: string
+  hours: number
+  priced_hours: number
+  metric_hours: number
+  avg: number | null
+  median: number | null
+  p25: number | null
+  pct_hours_positive: number | null
+  hours_in_top10: number
+  avg_last_24h: number | null
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path)
   if (!res.ok) throw new Error(`${path}: ${res.status} ${await res.text()}`)
@@ -192,6 +270,11 @@ export const api = {
   signals: (limit = 100) => get<Signal[]>(`/api/signals?limit=${limit}`),
   watchlist: () => get<WatchRow[]>('/api/watchlist'),
   briefPreview: () => get<{ brief_text: string }>('/api/brief/preview'),
+  process: () => get<ProcessQuote[]>('/api/process'),
+  processTop: (days = 7, limit = 20) => get<ProcessTopRow[]>(`/api/process/top?days=${days}&limit=${limit}`),
+  processDetail: (id: number | string) => get<ProcessDetail>(`/api/process/${id}`),
+  processHistory: (id: number | string, days = 7, bucket: '1h' | '6h' | '1d' = '1h') =>
+    get<ProcessHistoryPoint[]>(`/api/process/${id}/history?days=${days}&bucket=${bucket}`),
   triggerRun: async () => {
     const res = await fetch('/api/runs', { method: 'POST', body: '{}' })
     if (res.status === 409) throw new Error('a run is already in progress')

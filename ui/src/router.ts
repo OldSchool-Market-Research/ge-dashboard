@@ -31,6 +31,16 @@ const router = createRouter({
       component: () => import('./views/CalibrationView.vue'),
     },
     {
+      path: '/process',
+      name: 'process',
+      component: () => import('./views/ProcessView.vue'),
+    },
+    {
+      path: '/process/:id',
+      name: 'process-recipe',
+      component: () => import('./views/ProcessDetailView.vue'),
+    },
+    {
       path: '/signals',
       name: 'signals',
       component: () => import('./views/SignalsView.vue'),
