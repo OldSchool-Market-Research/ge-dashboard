@@ -11,10 +11,13 @@ export default defineConfig({
   plugins: [
     vue(),
     tailwindcss(),
-    // Jade's theme, Grand Exchange gold: try other looks in /styleguide's
-    // theme lab (dev only) and paste its config here
+    // Jade's theme, Grand Exchange gold on warm charcoal: the gold palette's
+    // brown neutral made gold lines and chips blend into the ground, so the
+    // greys come from a near-neutral warm charcoal instead. Try other looks
+    // in /styleguide's theme lab (dev only) and paste its config here
     ui({
       palette: 'gold',
+      colors: { neutral: '#1e1c1a' },
       fonts: { heading: 'Cascadia Code', mono: 'Cascadia Code' },
       style: 'hud',
       radius: 2,

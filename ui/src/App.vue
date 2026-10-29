@@ -19,10 +19,10 @@ const nav: NavSection[] = [
   {
     label: 'Engine',
     links: [
-      { to: '/', label: 'Overview', icon: LayoutDashboardIcon },
-      { to: '/book', label: 'Book', icon: BookOpenIcon },
-      { to: '/runs', label: 'Runs', icon: FlaskConicalIcon },
-      { to: '/pnl', label: 'P&L', icon: TrendingUpIcon },
+      { to: '/', label: 'Command center', icon: LayoutDashboardIcon },
+      { to: '/book', label: 'Strategy board', icon: BookOpenIcon },
+      { to: '/runs', label: 'Run health', icon: FlaskConicalIcon },
+      { to: '/pnl', label: 'Performance', icon: TrendingUpIcon },
       { to: '/calibration', label: 'Calibration', icon: CrosshairIcon },
       { to: '/signals', label: 'Signals', icon: RadioIcon },
     ],
