@@ -21,7 +21,9 @@ import { useRoute } from 'vue-router'
 import ItemIcon from '@/components/ItemIcon.vue'
 import ProcessHistoryChart from '@/components/ProcessHistoryChart.vue'
 import StatTile from '@/components/StatTile.vue'
+import UpdatedAgo from '@/components/UpdatedAgo.vue'
 import { api, errorText, gp, type ProcessDetail, type ProcessHistoryPoint, type ProcessQuote } from '@/lib/api'
+import { useAutoRefresh } from '@/lib/autoRefresh'
 import { activeTime, bindingRate, perWindow, throughputLabel } from '@/lib/process'
 
 const route = useRoute()
@@ -79,11 +81,17 @@ async function loadHistory() {
   if (seq === historySeq) history.value = pts
 }
 
+async function fetchAll() {
+  detail.value = await api.processDetail(id)
+  await loadHistory()
+}
+const { updatedAt, refreshError, markUpdated } = useAutoRefresh(fetchAll)
+
 async function load() {
   error.value = null
   try {
-    detail.value = await api.processDetail(id)
-    await loadHistory()
+    await fetchAll()
+    markUpdated()
   } catch (e) {
     error.value = errorText(e, 'There is no processing recipe with this id.')
   }
@@ -111,6 +119,7 @@ onMounted(load)
         <ItemIcon :icon="q.icon" />
         <PageHeader :title="q.name" :description="`${q.category} · ${rateSource}`" />
       </div>
+      <UpdatedAgo :updated-at="updatedAt" :error="refreshError" />
 
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <StatTile label="gp/hr (slow)" :value="gp(q.gp_hr)" :signed="q.gp_hr" :hint="gpHint(q, 'slow')" />
