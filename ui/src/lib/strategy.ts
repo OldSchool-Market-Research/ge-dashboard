@@ -62,7 +62,8 @@ export interface LegView {
   name: string
   side: 'buy' | 'sell'
   qty: number
-  price: number | null // live when the evaluator priced it, else as shipped
+  price: number | null // from the latest eval; null = not priced, never the plan price
+  plan: number | null // as shipped
   age_s: number | null
   icon: string | null
 }
@@ -72,25 +73,44 @@ export function latestEval(s: Strategy): Evaluation | null {
   return s.live ?? s.last_eval ?? null
 }
 
-// legs with icons and the evaluator's live prices; single-item strategies
-// (no legs) get a buy and a sell leg of their primary item
+// Legs with icons and the latest eval's prices. A leg the evaluator didn't
+// price stays null (nothing traded that side), never the plan price.
+// Single-item strategies (no legs) get a buy leg at the eval's insta-sell
+// low and a sell leg at its insta-buy high. `ev` undefined = the strategy's
+// own latest eval; null = no eval.
 export function legsOf(s: Strategy, icons?: Record<string, string>, ev?: Evaluation | null): LegView[] {
   const iconMap = icons ?? s.item_icons ?? {}
-  const live = new Map((ev ?? latestEval(s))?.detail?.legs?.map((l) => [`${l.side}:${l.item_id}`, l]) ?? [])
+  const e = ev === undefined ? latestEval(s) : ev
+  const live = new Map(e?.detail?.legs?.map((l) => [`${l.side}:${l.item_id}`, l]) ?? [])
   const icon = (id: number) => iconMap[String(id)] ?? null
   if (s.legs?.length) {
     return s.legs.map((l) => {
       const side = l.side === 'sell' ? 'sell' : 'buy'
       const lv = live.get(`${side}:${l.item_id}`)
-      return { item_id: l.item_id, name: l.name, side, qty: l.qty, price: lv?.price ?? l.price, age_s: lv?.age_s ?? null, icon: icon(l.item_id) }
+      return { item_id: l.item_id, name: l.name, side, qty: l.qty, price: lv?.price ?? null, plan: l.price, age_s: lv?.age_s ?? null, icon: icon(l.item_id) }
     })
   }
   const item = s.items?.find((i) => i.id === s.primary_item_id) ?? s.items?.[0]
   if (!item) return []
   return [
-    { item_id: item.id, name: item.name, side: 'buy', qty: 1, price: s.entry_price, age_s: null, icon: icon(item.id) },
-    { item_id: item.id, name: item.name, side: 'sell', qty: 1, price: s.exit_price, age_s: null, icon: icon(item.id) },
+    { item_id: item.id, name: item.name, side: 'buy', qty: 1, price: e?.cur_low ?? null, plan: s.entry_price, age_s: e?.low_age_s ?? null, icon: icon(item.id) },
+    { item_id: item.id, name: item.name, side: 'sell', qty: 1, price: e?.cur_high ?? null, plan: s.exit_price, age_s: e?.high_age_s ?? null, icon: icon(item.id) },
   ]
+}
+
+// C strategies convert legs into a product; every other kind trades one item
+export function isCombo(s: Strategy): boolean {
+  return s.archetype === 'C'
+}
+
+// what one margin is measured over
+export function unitLabel(s: Strategy): string {
+  return isCombo(s) ? 'per conversion' : 'per item'
+}
+
+// GE sell tax as the evaluator charges it: 2%, rounded down, capped at 5M
+export function postTax(price: number): number {
+  return price - Math.min(Math.floor(price / 50), 5_000_000)
 }
 
 // the short name a card leads with: the primary item, else the first one
@@ -102,27 +122,33 @@ export function projectedPerHour(s: Strategy): number | null {
   return s.projected_per_1h_gp ?? s.per_1h_gp
 }
 
-// the margin the strategy shipped with: the C evaluator records it per
-// conversion; otherwise exit minus entry
+// The post-tax margin the strategy shipped with. A C exit_price is already
+// post-tax per conversion (the evaluator records it as projected_margin);
+// every other kind's exit_price is the gross sell offer, so tax it here.
 export function planMargin(s: Strategy, ev?: Evaluation | null): number {
-  return ev?.detail?.projected_margin ?? s.exit_price - s.entry_price
+  if (isCombo(s)) return ev?.detail?.projected_margin ?? s.exit_price - s.entry_price
+  return postTax(s.exit_price) - s.entry_price
 }
 
-// The live margin of one cycle. C evaluations carry the post-tax conversion
-// margin in detail (their cur_margin is only the primary item's own spread);
-// every other kind's cur_margin is the strategy's margin.
-export function evalMargin(e: Evaluation | null | undefined): number | null {
+// The live post-tax margin at one eval. C: the conversion margin from the
+// eval's detail, null when a leg wasn't priced (the stored sum is then
+// partial) — never cur_margin, which there is only the primary item's own
+// spread. Other kinds: cur_margin, the item's post-tax buy/sell spread.
+export function evalMargin(e: Evaluation | null | undefined, combo: boolean): number | null {
   if (!e) return null
-  return e.detail?.combo_margin_now ?? e.cur_margin
+  if (!combo) return e.cur_margin
+  if (e.checks?.legs_priced === false) return null
+  return e.detail?.combo_margin_now ?? null
 }
 
-export function trailMargin(p: TrailPoint): number | null {
-  return p.combo_margin ?? p.cur_margin
+// same rule for a trail point (the server already nulls a partial combo)
+export function trailMargin(p: TrailPoint, combo: boolean): number | null {
+  return combo ? (p.combo_margin ?? null) : p.cur_margin
 }
 
 export function marginNow(s: Strategy): number | null {
   const p = s.trail?.at(-1)
-  return p ? trailMargin(p) : evalMargin(latestEval(s))
+  return p ? trailMargin(p, isCombo(s)) : evalMargin(latestEval(s), isCombo(s))
 }
 
 export type Severity = 'critical' | 'serious' | 'warning' | 'info'
@@ -140,10 +166,10 @@ const SEVERITY_ORDER: Severity[] = ['critical', 'serious', 'warning', 'info']
 // about the data, never a prediction:
 //   critical  the evaluator says kill right now
 //   serious   the latest live margin is negative
-//   warning   kill signals keep firing, or nothing has filled after a day,
-//             or units x entry disagrees with the capital it reserved
-//   info      a check fails on every open strategy (a rule problem, not a
-//             strategy problem)
+//   warning   kill signals keep firing, or the estimated realized pace was
+//             zero across the trail a day after opening, or units x entry
+//             disagrees with the capital it reserved
+//   info      a check fails on every open strategy
 export function needsYou(book: Strategy[], now = Date.now()): Alert[] {
   const out: Alert[] = []
   for (const s of book) {
@@ -155,14 +181,19 @@ export function needsYou(book: Strategy[], now = Date.now()): Alert[] {
     if ((s.live_verdict ?? ev?.verdict) === 'kill_signal') {
       out.push({ severity: 'critical', title: `${name}: kill signal now`, why: 'The evaluator flags this position to close.', strategy: s })
     } else if (lastMargin !== null && lastMargin < 0) {
-      out.push({ severity: 'serious', title: `${name} went negative`, why: `Latest live margin is ${gp(lastMargin)} per cycle.`, strategy: s })
+      out.push({ severity: 'serious', title: `${name} went negative`, why: `Latest live margin is ${gp(lastMargin)} ${unitLabel(s)}, after tax.`, strategy: s })
     }
     const kills = s.verdict_counts?.kill_signal ?? 0
-    const filled = trail.some((p) => (p.realized_per_1h_gp ?? 0) > 0)
+    const paced = trail.some((p) => (p.realized_per_1h_gp ?? 0) > 0)
     if (kills >= 5) {
       out.push({ severity: 'warning', title: `${name}: repeated kill signals`, why: `${kills} kill signals over ${s.n_evals ?? '?'} evals.`, strategy: s })
-    } else if (ageH >= 24 && trail.length >= 10 && !filled) {
-      out.push({ severity: 'warning', title: `${name} is not filling`, why: `No realized gp in the last ${trail.length} evals, ${Math.round(ageH)}h after opening.`, strategy: s })
+    } else if (s.state !== 'armed' && ageH >= 24 && trail.length >= 10 && !paced) {
+      out.push({
+        severity: 'warning',
+        title: `${name}: no realized pace yet`,
+        why: `The estimated realized pace was zero in all of the last ${trail.length} evals, ${Math.round(ageH)}h after opening.`,
+        strategy: s,
+      })
     }
     if (s.units_used && s.capital_required && s.entry_price > 0) {
       const implied = s.units_used * s.entry_price
@@ -181,7 +212,7 @@ export function needsYou(book: Strategy[], now = Date.now()): Alert[] {
     for (const k of keys) {
       const failing = book.filter((s) => (latestEval(s)?.checks ?? s.live_checks ?? {})[k] === false)
       if (failing.length === book.length) {
-        out.push({ severity: 'info', title: `"${checkLabel(k)}" fails on all ${book.length}`, why: 'One check failing everywhere points at the rule, not the strategies.' })
+        out.push({ severity: 'info', title: `"${checkLabel(k)}" fails on all ${book.length}`, why: 'Every open strategy fails this check right now.' })
       }
     }
   }

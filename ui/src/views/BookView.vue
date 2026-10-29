@@ -126,7 +126,7 @@ onMounted(async () => {
         <div class="flex flex-wrap items-baseline justify-between gap-2">
           <h2 class="text-sm font-medium">Checks across the book</h2>
           <p v-if="failingEverywhere.length" class="text-sm text-muted-foreground">
-            "{{ failingEverywhere[0].label }}" fails on all {{ book.length }}: that one check drives the degraded verdicts.
+            {{ failingEverywhere.map((c) => `"${c.label}"`).join(', ') }} {{ failingEverywhere.length > 1 ? 'fail' : 'fails' }} on all {{ book.length }} open strategies.
           </p>
         </div>
         <div class="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">

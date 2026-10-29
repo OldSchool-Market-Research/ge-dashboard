@@ -33,7 +33,7 @@ const shippedOnly = ref(true)
 
 const oldestFirst = computed(() => [...runs.value].reverse())
 const counts = computed(() => {
-  const c = { shipped: 0, empty: 0, failed: 0, running: 0 }
+  const c = { shipped: 0, vetoed: 0, empty: 0, failed: 0, running: 0 }
   for (const r of runs.value) c[runOutcome(r)]++
   return c
 })
@@ -130,8 +130,12 @@ async function trigger() {
     <ErrorState v-if="error" title="Runs unavailable" :description="error" />
     <template v-else>
       <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Shipped" :value="String(counts.shipped)" hint="ran clean, shipped at least one" />
-        <StatTile label="Shipped nothing" :value="String(counts.empty)" hint="ran clean, nothing cleared the bar" />
+        <StatTile label="Shipped" :value="String(counts.shipped)" hint="at least one strategy not vetoed" />
+        <StatTile
+          label="Shipped nothing"
+          :value="String(counts.empty + counts.vetoed)"
+          :hint="`${counts.empty} nothing cleared the bar · ${counts.vetoed} all vetoed`"
+        />
         <StatTile
           label="Failed"
           :value="String(counts.failed)"
@@ -148,7 +152,7 @@ async function trigger() {
         <div class="flex flex-wrap items-baseline justify-between gap-2">
           <h2 class="text-sm font-medium">Every run: tokens spent, colored by outcome</h2>
           <div class="flex flex-wrap gap-3 text-xs text-muted-foreground">
-            <span v-for="k in (['shipped', 'empty', 'failed'] as const)" :key="k" class="inline-flex items-center gap-1.5">
+            <span v-for="k in (['shipped', 'vetoed', 'empty', 'failed'] as const)" :key="k" class="inline-flex items-center gap-1.5">
               <span class="size-2.5 rounded-[1px]" :style="{ background: OUTCOME[k].color }" />{{ OUTCOME[k].label }}
             </span>
           </div>

@@ -22,7 +22,21 @@ import UpdatedAgo from '@/components/UpdatedAgo.vue'
 import VerdictStrip from '@/components/VerdictStrip.vue'
 import { api, errorText, gp, type Evaluation, type Strategy } from '@/lib/api'
 import { useAutoRefresh } from '@/lib/autoRefresh'
-import { ageText, cadence, checkLines, evalMargin, legsOf, planMargin, projectedPerHour, shortName } from '@/lib/strategy'
+import {
+  ageText,
+  cadence,
+  checkLines,
+  evalMargin,
+  isCombo,
+  legsOf,
+  planMargin,
+  projectedPerHour,
+  shortName,
+  unitLabel,
+} from '@/lib/strategy'
+
+// the API returns at most this many evaluations, newest first
+const EVAL_LIMIT = 600
 
 const route = useRoute()
 const strategy = ref<Strategy | null>(null)
@@ -31,18 +45,21 @@ const icons = ref<Record<string, string>>({})
 const error = ref<string | null>(null)
 
 const s = computed(() => strategy.value)
+const combo = computed(() => (s.value ? isCombo(s.value) : false))
+const unit = computed(() => (s.value ? unitLabel(s.value) : ''))
 const latest = computed(() => evals.value.at(-1) ?? null)
 const legs = computed(() => (s.value ? legsOf(s.value, icons.value, latest.value) : []))
 const plan = computed(() => (s.value ? planMargin(s.value, latest.value) : 0))
-const live = computed(() => evalMargin(latest.value))
+const live = computed(() => evalMargin(latest.value, combo.value))
 const projected = computed(() => (s.value ? projectedPerHour(s.value) : null))
 const units = computed(() => s.value?.units_used ?? null)
+const evalCount = computed(() => (evals.value.length >= EVAL_LIMIT ? `last ${evals.value.length}` : String(evals.value.length)))
 
-const marginPoints = computed(() => evals.value.map((e) => ({ t: Date.parse(e.at), v: evalMargin(e) })))
+const marginPoints = computed(() => evals.value.map((e) => ({ t: Date.parse(e.at), v: evalMargin(e, combo.value) })))
 const kills = computed(() =>
   evals.value
-    .filter((e) => e.verdict === 'kill_signal' && evalMargin(e) !== null)
-    .map((e) => ({ t: Date.parse(e.at), v: evalMargin(e)!, label: `kill signal ${new Date(e.at).toLocaleString()}` })),
+    .filter((e) => e.verdict === 'kill_signal' && evalMargin(e, combo.value) !== null)
+    .map((e) => ({ t: Date.parse(e.at), v: evalMargin(e, combo.value)!, label: `kill signal ${new Date(e.at).toLocaleString()}` })),
 )
 const marginStats = computed(() => {
   const vals = marginPoints.value.map((p) => p.v).filter((v): v is number => v !== null).sort((a, b) => a - b)
@@ -58,19 +75,23 @@ const realizedStats = computed(() => {
   return { hits: vals.filter((v) => v > 0).length, n: realizedPoints.value.length, peak: vals.length ? Math.max(...vals) : null }
 })
 
-// latest checks, with the stale legs named for the freshness checks
+// latest checks, with the stale or thin leg named. A leg with no recorded
+// trade time or volume is said to be unknown, never ranked as oldest/thinnest.
 const checks = computed(() => {
   const legDetail = latest.value?.detail?.legs ?? []
-  const stale = [...legDetail].sort((a, b) => (b.age_s ?? Infinity) - (a.age_s ?? Infinity))
+  const unknownAge = legDetail.filter((l) => l.age_s == null).map((l) => l.name)
+  const byAge = legDetail.filter((l) => l.age_s != null).sort((a, b) => b.age_s! - a.age_s!)
+  const byVol = legDetail.filter((l) => l.vol_30m != null).sort((a, b) => a.vol_30m! - b.vol_30m!)
   return checkLines(latest.value?.checks).map((c) => {
     let detail = ''
-    if (c.key.includes('fresh') && stale.length) {
-      detail = `Oldest leg: ${stale[0].name}, last traded ${ageText(stale[0].age_s)} ago.`
-    } else if (c.key === 'vol_ok' && legDetail.length) {
-      const thin = [...legDetail].sort((a, b) => (a.vol_30m ?? 0) - (b.vol_30m ?? 0))[0]
-      detail = `Thinnest leg: ${thin.name}, ${thin.vol_30m ?? 0} traded in 30 min.`
+    if (c.key.includes('fresh') && unknownAge.length) {
+      detail = `No recorded trade for ${unknownAge.join(', ')}.`
+    } else if (c.key.includes('fresh') && byAge.length) {
+      detail = `Oldest leg: ${byAge[0].name}, last traded ${ageText(byAge[0].age_s)} ago.`
+    } else if (c.key === 'vol_ok' && byVol.length) {
+      detail = `Thinnest leg: ${byVol[0].name}, ${byVol[0].vol_30m} traded in 30 min.`
     } else if (c.key === 'margin_ok' && live.value !== null) {
-      detail = `Live margin ${gp(live.value)} per cycle against the plan's ${gp(plan.value)}.`
+      detail = `Live margin ${gp(live.value)} ${unit.value} against the plan's ${gp(plan.value)}, both after tax.`
     }
     return { ...c, detail }
   })
@@ -80,7 +101,9 @@ const legRows = computed(() => {
   const detail = new Map((latest.value?.detail?.legs ?? []).map((l) => [`${l.side}:${l.item_id}`, l]))
   return legs.value.map((l) => {
     const d = detail.get(`${l.side}:${l.item_id}`)
-    return { ...l, vol: d?.vol_30m ?? null, batch: l.price !== null && units.value ? l.price * l.qty * units.value : null }
+    // single-item strategies have no per-leg detail: the eval's own volume is the item's
+    const vol = d ? (d.vol_30m ?? null) : s.value?.legs?.length ? null : (latest.value?.vol_30m ?? null)
+    return { ...l, vol, batch: l.price !== null && units.value ? l.price * l.qty * units.value : null }
   })
 })
 
@@ -122,7 +145,7 @@ watch(() => route.params.id, load)
           <div class="flex flex-wrap items-center gap-2 text-xs">
             <Badge variant="outline" class="font-mono">{{ s.archetype }}</Badge>
             <span class="font-mono text-muted-foreground">
-              #{{ s.strategy_id }} · opened {{ new Date(s.opened_at).toLocaleString() }} · {{ evals.length }} evals
+              #{{ s.strategy_id }} · opened {{ new Date(s.opened_at).toLocaleString() }} · {{ evalCount }} evals
             </span>
             <StatusBadge :state="s.closed_at ? s.state : (latest?.verdict ?? s.state)" />
             <Badge variant="outline">confidence: {{ s.confidence }}</Badge>
@@ -138,18 +161,18 @@ watch(() => route.params.id, load)
 
       <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <StatTile label="Capital" :value="gp(s.capital_required)" :hint="units ? `${units.toLocaleString()} per batch` : undefined" />
-        <StatTile label="Per cycle" :value="gp(s.per_cycle_gp)" :hint="cadence(s.attention_spec?.checks_per_hour) + ' checks'" />
+        <StatTile label="Per cycle" :value="gp(s.per_cycle_gp)" hint="one 4h buy-limit batch" />
         <StatTile label="Projected" :value="`${gp(projected)}/hr`" hint="per the plan" />
-        <StatTile label="Plan margin" :value="gp(plan)" hint="per cycle, after tax" />
-        <StatTile label="Live margin" :value="gp(live)" :signed="live" hint="latest eval" />
+        <StatTile label="Plan margin" :value="gp(plan)" :hint="`${unit}, after tax`" />
+        <StatTile label="Live margin" :value="gp(live)" :signed="live" :hint="`${unit}, latest eval`" />
       </div>
 
       <section class="space-y-2 rounded-md border bg-card p-4">
-        <h2 class="text-sm font-medium">Live margin against the plan</h2>
+        <h2 class="text-sm font-medium">Live margin {{ unit }} against the plan, after tax</h2>
         <p v-if="marginStats" class="text-sm text-muted-foreground">
           Median live margin is <strong class="font-mono text-foreground">{{ gp(marginStats.median) }}</strong>
           <template v-if="marginStats.pct !== null">, {{ marginStats.pct }}% of the plan's {{ gp(plan) }}</template>.
-          Below zero in {{ marginStats.negative }} of {{ marginStats.n }} evals<template v-if="kills.length">; {{ kills.length }} kill signals marked</template>.
+          Below zero in {{ marginStats.negative }} of the {{ marginStats.n }} priced evals shown<template v-if="kills.length">; {{ kills.length }} kill signals marked</template>.
         </p>
         <LineChart
           :points="marginPoints"
@@ -163,7 +186,7 @@ watch(() => route.params.id, load)
         <h2 class="text-sm font-medium">Estimated realized pace at each eval</h2>
         <p class="text-sm text-muted-foreground">
           What the market could absorb at that moment, after the haircut. Above zero in
-          <strong class="font-mono text-foreground">{{ realizedStats.hits }}</strong> of {{ realizedStats.n }} evals<template v-if="realizedStats.peak">; best {{ gp(realizedStats.peak) }}/hr</template><template v-if="projected"> against {{ gp(projected) }}/hr projected (dashed)</template>.
+          <strong class="font-mono text-foreground">{{ realizedStats.hits }}</strong> of the {{ realizedStats.n }} evals shown<template v-if="realizedStats.peak">; best {{ gp(realizedStats.peak) }}/hr</template><template v-if="projected"> against {{ gp(projected) }}/hr projected (dashed)</template>.
         </p>
         <RealizedBars
           :points="realizedPoints"
@@ -207,6 +230,7 @@ watch(() => route.params.id, load)
                 <TableRow>
                   <TableHead>Item</TableHead>
                   <TableHead>Side</TableHead>
+                  <TableHead class="text-right">Plan</TableHead>
                   <TableHead class="text-right">Price now</TableHead>
                   <TableHead class="text-right">Last trade</TableHead>
                   <TableHead class="text-right">Vol 30m</TableHead>
@@ -221,6 +245,7 @@ watch(() => route.params.id, load)
                     </RouterLink>
                   </TableCell>
                   <TableCell class="font-mono text-xs text-muted-foreground">{{ l.side }}</TableCell>
+                  <TableCell class="text-right font-mono text-muted-foreground tabular-nums">{{ gp(l.plan) }}</TableCell>
                   <TableCell class="text-right font-mono tabular-nums">{{ gp(l.price) }}</TableCell>
                   <TableCell class="text-right font-mono text-muted-foreground tabular-nums">{{ l.age_s === null ? '—' : `${ageText(l.age_s)} ago` }}</TableCell>
                   <TableCell class="text-right font-mono text-muted-foreground tabular-nums">{{ l.vol ?? '—' }}</TableCell>

@@ -36,7 +36,7 @@ const sells = computed(() => props.legs.filter((l) => l.side === 'sell'))
           class="relative flex items-center justify-center border bg-muted/40"
           :class="[large ? 'size-16' : 'size-11', l.side === 'sell' ? 'border-primary' : '']"
         >
-          <ItemIcon :icon="l.icon" />
+          <ItemIcon :icon="l.icon" :name="large ? undefined : l.name" />
           <span v-if="l.qty !== 1" class="absolute right-0.5 bottom-0 font-mono text-[11px] tabular-nums">×{{ l.qty }}</span>
         </div>
         <span v-if="large" class="line-clamp-2 text-center text-xs text-muted-foreground">{{ l.name }}</span>

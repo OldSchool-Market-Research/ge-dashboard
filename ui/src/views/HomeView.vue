@@ -55,9 +55,9 @@ const lanes = computed(() =>
     .sort((a, b) => (b.attention_spec?.checks_per_hour ?? 0) - (a.attention_spec?.checks_per_hour ?? 0))
     .map((s) => {
       const cph = s.attention_spec?.checks_per_hour ?? 0
-      const every = cph > 0 ? 1 / cph : Infinity
       const ticks: number[] = []
-      for (let h = 0; h <= HOURS && ticks.length < 200; h += every) ticks.push((h / HOURS) * 100)
+      // no cadence on record: no ticks (not one at "now")
+      if (cph > 0) for (let h = 0; h <= HOURS && ticks.length < 200; h += 1 / cph) ticks.push((h / HOURS) * 100)
       return { s, ticks, cadence: cadence(cph), n: ticks.length }
     }),
 )
@@ -68,9 +68,11 @@ const hourLabels = computed(() => {
   )
 })
 
-// "placed" ticks are a per-viewer convenience for tonight, kept in this
-// browser only (keyed by UTC day); the page works the same without storage
-const dayKey = `ge-placed-${new Date().toISOString().slice(0, 10)}`
+// "placed" ticks are a per-viewer convenience for today, kept in this
+// browser only, keyed by the viewer's LOCAL date (a UTC key would reset in
+// the evening west of UTC); the page works the same without storage
+const today = new Date()
+const dayKey = `ge-placed-${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 function readPlaced(): Record<string, boolean> {
   try {
     return JSON.parse(localStorage.getItem(dayKey) ?? '{}')
@@ -217,10 +219,10 @@ onMounted(async () => {
           <div class="space-y-2">
             <div v-for="l in lanes" :key="l.s.strategy_id" class="flex items-center gap-2">
               <RouterLink :to="`/book/${l.s.strategy_id}`" :title="shortName(l.s)" class="shrink-0">
-                <ItemIcon :icon="l.s.item_icons?.[String(l.s.primary_item_id)]" />
+                <ItemIcon :icon="l.s.item_icons?.[String(l.s.primary_item_id)]" :name="shortName(l.s)" />
               </RouterLink>
               <span class="w-20 shrink-0 font-mono text-[11px] text-muted-foreground">{{ l.cadence }}</span>
-              <div class="relative h-5 flex-1 border-b" role="img" :aria-label="`${shortName(l.s)}: ${l.n} checks in the next ${HOURS} hours`">
+              <div class="relative h-5 flex-1 border-b" role="img" :aria-label="l.n ? `${shortName(l.s)}: ${l.n} checks in the next ${HOURS} hours` : `${shortName(l.s)}: no check cadence on record`">
                 <span v-for="(t, i) in l.ticks" :key="i" class="absolute top-0.5 h-4 w-0.5 bg-chart-1" :style="{ left: `calc(${t}% - 1px)` }" />
               </div>
             </div>
@@ -262,7 +264,7 @@ onMounted(async () => {
                 <TableCell>
                   <label :for="`placed-${c.s.strategy_id}`" class="flex cursor-pointer flex-wrap items-center gap-2">
                     <span v-for="b in c.buys" :key="b.item_id" class="inline-flex items-center gap-0.5" :title="b.name">
-                      <ItemIcon :icon="b.icon" />
+                      <ItemIcon :icon="b.icon" :name="b.name" />
                       <span class="font-mono text-xs text-muted-foreground tabular-nums">×{{ b.total.toLocaleString() }}</span>
                     </span>
                     <span class="text-xs text-muted-foreground">#{{ c.s.strategy_id }} {{ shortName(c.s) }}</span>
@@ -270,7 +272,7 @@ onMounted(async () => {
                 </TableCell>
                 <TableCell>
                   <span v-for="x in c.sells" :key="x.item_id" class="inline-flex items-center gap-0.5" :title="x.name">
-                    <ItemIcon :icon="x.icon" />
+                    <ItemIcon :icon="x.icon" :name="x.name" />
                     <span class="font-mono text-xs text-primary-text tabular-nums">×{{ x.total.toLocaleString() }}</span>
                   </span>
                 </TableCell>

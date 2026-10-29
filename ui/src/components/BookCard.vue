@@ -12,14 +12,24 @@ import LegFlow from '@/components/LegFlow.vue'
 import Sparkline from '@/components/Sparkline.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { gp, timeAgo, type Strategy } from '@/lib/api'
-import { cadence, latestEval, legsOf, marginNow as liveMargin, projectedPerHour, shortName, trailMargin } from '@/lib/strategy'
+import {
+  cadence,
+  isCombo,
+  latestEval,
+  legsOf,
+  marginNow as liveMargin,
+  projectedPerHour,
+  shortName,
+  trailMargin,
+  unitLabel,
+} from '@/lib/strategy'
 
 const props = defineProps<{ strategy: Strategy }>()
 
 const s = computed(() => props.strategy)
 const ev = computed(() => latestEval(s.value))
 const legs = computed(() => legsOf(s.value))
-const margins = computed(() => (s.value.trail ?? []).map(trailMargin))
+const margins = computed(() => (s.value.trail ?? []).map((p) => trailMargin(p, isCombo(s.value))))
 const marginNow = computed(() => liveMargin(s.value))
 const verdict = computed(() => s.value.live_verdict ?? ev.value?.verdict ?? s.value.state)
 const checks = computed(() => s.value.live_checks ?? ev.value?.checks)
@@ -42,12 +52,12 @@ const checks = computed(() => s.value.live_checks ?? ev.value?.checks)
 
       <LegFlow :legs="legs" />
       <p class="font-mono text-xs text-muted-foreground tabular-nums">
-        cycle: cost {{ gp(s.entry_price) }} → {{ gp(s.exit_price) }} after tax
+        {{ unitLabel(s) }}: buy {{ gp(s.entry_price) }} → sell {{ gp(s.exit_price) }}{{ isCombo(s) ? ' after tax' : '' }}
       </p>
 
       <figure class="space-y-1">
         <figcaption class="flex justify-between text-xs text-muted-foreground">
-          <span>Live margin, last {{ margins.length }} evals</span>
+          <span>Live margin {{ unitLabel(s) }}, last {{ margins.length }} evals</span>
           <span class="font-mono text-foreground tabular-nums">now {{ gp(marginNow) }}</span>
         </figcaption>
         <Sparkline :values="margins" :label="`Live margin for ${shortName(s)}, now ${gp(marginNow)}`" />
