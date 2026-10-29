@@ -237,7 +237,7 @@ onMounted(load)
               </TableCell>
               <TableCell class="text-right tabular-nums">
                 {{ gp(perWindow(gpHr(q))) }}
-                <div v-if="activeTime(q, basis)" class="text-xs text-muted-foreground">~{{ activeTime(q, basis) }} clicking</div>
+                <div v-if="gpHr(q) !== null && activeTime(q, basis)" class="text-xs text-muted-foreground">~{{ activeTime(q, basis) }} clicking</div>
               </TableCell>
               <TableCell class="text-right tabular-nums">
                 {{ gp(margin(q)) }}

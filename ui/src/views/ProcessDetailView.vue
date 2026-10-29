@@ -118,7 +118,8 @@ onMounted(load)
         <StatTile
           label="Per 4h window (slow)"
           :value="gp(perWindow(q.gp_hr))"
-          :hint="activeTime(q) ? `~${activeTime(q)} of clicking at player speed` : 'one GE buy-limit window'"
+          :signed="perWindow(q.gp_hr)"
+          :hint="q.gp_hr !== null && activeTime(q) ? `~${activeTime(q)} of clicking at player speed` : 'one GE buy-limit window'"
         />
         <StatTile
           label="Margin / action (slow)"
