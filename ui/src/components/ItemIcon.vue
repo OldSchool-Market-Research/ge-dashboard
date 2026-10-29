@@ -4,10 +4,15 @@
 // small pixel art: kept at native size, crisp, and hidden if one fails to
 // load rather than showing a broken-image box. Decorative: the item name is
 // always next to it, so alt is empty.
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
-defineProps<{ icon: string | null | undefined }>()
+const props = defineProps<{ icon: string | null | undefined }>()
 const failed = ref(false)
+// a new icon gets a fresh try (a one-off upstream 502 shouldn't stick)
+watch(
+  () => props.icon,
+  () => (failed.value = false),
+)
 </script>
 
 <template>
