@@ -243,6 +243,42 @@ export interface ProcessTopRow {
   avg_last_24h: number | null
 }
 
+// Item lookup (GET /api/items*): every GE item with its latest quote from
+// the last 14 days, the ingester's post-tax margin on that same row, and 24h
+// volumes. A null price means nothing traded that side recently, never 0.
+export interface ItemRow {
+  item_id: number
+  name: string
+  members: boolean | null
+  buy_limit: number | null
+  icon: string | null
+  high: number | null // latest insta-buy price
+  high_time: string | null
+  low: number | null // latest insta-sell price
+  low_time: string | null
+  margin: number | null // post-tax flip margin
+  roi_pct: number | null
+  limit_profit: number | null // margin x buy limit (one 4h window)
+  high_vol_24h: number
+  low_vol_24h: number
+}
+
+export interface ItemDetail extends ItemRow {
+  examine: string | null
+  value: number | null
+  lowalch: number | null
+  highalch: number | null
+  recipes: { recipe_id: number; name: string; category: string; side: 'buy' | 'sell'; gp_hr: number | null }[]
+}
+
+export interface ItemHistoryPoint {
+  bucket: string
+  avg_high: number | null
+  avg_low: number | null
+  high_vol: number
+  low_vol: number
+}
+
 // ApiError keeps the HTTP status so a view can branch on it (503 = the
 // processing schema isn't applied yet) without string-matching a message
 // that also contains the URL.
@@ -295,6 +331,10 @@ export const api = {
   watchlist: () => get<WatchRow[]>('/api/watchlist'),
   briefPreview: () => get<{ brief_text: string }>('/api/brief/preview'),
   process: () => get<ProcessQuote[]>('/api/process'),
+  items: () => get<ItemRow[]>('/api/items'),
+  item: (id: number | string) => get<ItemDetail>(`/api/items/${id}`),
+  itemHistory: (id: number | string, days: 1 | 7 | 30 | 90 = 7) =>
+    get<ItemHistoryPoint[]>(`/api/items/${id}/history?days=${days}`),
   processTop: (days = 7, limit = 20, metric: 'gp_hr' | 'gp_hr_insta' = 'gp_hr') =>
     get<ProcessTopRow[]>(`/api/process/top?days=${days}&limit=${limit}&metric=${metric}`),
   processDetail: (id: number | string) => get<ProcessDetail>(`/api/process/${id}`),

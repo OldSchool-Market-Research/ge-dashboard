@@ -7,6 +7,7 @@ import {
   FactoryIcon,
   FlaskConicalIcon,
   LayoutDashboardIcon,
+  PackageSearchIcon,
   PaletteIcon,
   RadioIcon,
   SettingsIcon,
@@ -28,7 +29,10 @@ const nav: NavSection[] = [
   },
   {
     label: 'Market',
-    links: [{ to: '/process', label: 'Processing', icon: FactoryIcon }],
+    links: [
+      { to: '/items', label: 'Items', icon: PackageSearchIcon },
+      { to: '/process', label: 'Processing', icon: FactoryIcon },
+    ],
   },
   {
     label: 'App',

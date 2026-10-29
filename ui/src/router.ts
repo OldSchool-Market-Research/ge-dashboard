@@ -41,6 +41,16 @@ const router = createRouter({
       component: () => import('./views/ProcessDetailView.vue'),
     },
     {
+      path: '/items',
+      name: 'items',
+      component: () => import('./views/ItemsView.vue'),
+    },
+    {
+      path: '/items/:id',
+      name: 'item',
+      component: () => import('./views/ItemDetailView.vue'),
+    },
+    {
       path: '/signals',
       name: 'signals',
       component: () => import('./views/SignalsView.vue'),
