@@ -42,6 +42,13 @@ export default defineConfig({
         target: process.env.VITE_BACKEND ?? 'http://10.43.208.143:8410',
         changeOrigin: true,
       },
+      // prod serves /icons from the Go server's Wiki cache (icons.go); dev
+      // goes to the Wiki directly (spaces are underscores in its file URLs)
+      '/icons': {
+        target: 'https://oldschool.runescape.wiki',
+        changeOrigin: true,
+        rewrite: (p) => '/images/' + p.slice('/icons/'.length).replace(/%20/g, '_'),
+      },
     },
   },
 })

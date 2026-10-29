@@ -1,6 +1,7 @@
 // ge-dashboard: the web face of the research engine. A single static Go
-// binary serving the embedded Vue SPA (built from ui/ — jade's app-template)
-// and reverse-proxying /api/* to the orchestrator, SSE included. Stateless:
+// binary serving the embedded Vue SPA (built from ui/ — jade's app-template),
+// reverse-proxying /api/* to the orchestrator (SSE included), and serving
+// item icons from a memory cache of the OSRS Wiki's (icons.go). Stateless:
 // every fact on screen comes from the orchestrator API.
 package main
 
@@ -38,6 +39,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", proxy)
+	mux.Handle("/icons/", newIconProxy(getenv("GE_DASHBOARD_ICON_UPSTREAM", "https://oldschool.runescape.wiki")))
 	// SPA contract: real files (assets, favicon) serve as-is; every other
 	// path falls back to index.html and the router takes it from there.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

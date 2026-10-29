@@ -18,10 +18,11 @@ import {
 import { ArrowLeftIcon, HistoryIcon } from '@lucide/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import ItemIcon from '@/components/ItemIcon.vue'
 import ProcessHistoryChart from '@/components/ProcessHistoryChart.vue'
 import StatTile from '@/components/StatTile.vue'
 import { api, errorText, gp, type ProcessDetail, type ProcessHistoryPoint, type ProcessQuote } from '@/lib/api'
-import { bindingRate, throughputLabel } from '@/lib/process'
+import { activeTime, bindingRate, perWindow, throughputLabel } from '@/lib/process'
 
 const route = useRoute()
 const id = route.params.id as string
@@ -106,11 +107,19 @@ onMounted(load)
     />
 
     <template v-else-if="detail && q">
-      <PageHeader :title="q.name" :description="`${q.category} · ${rateSource}`" />
+      <div class="flex items-center gap-3">
+        <ItemIcon :icon="q.icon" />
+        <PageHeader :title="q.name" :description="`${q.category} · ${rateSource}`" />
+      </div>
 
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <StatTile label="gp/hr (slow)" :value="gp(q.gp_hr)" :signed="q.gp_hr" :hint="gpHint(q, 'slow')" />
         <StatTile label="gp/hr (insta)" :value="gp(q.gp_hr_insta)" :signed="q.gp_hr_insta" :hint="gpHint(q, 'insta')" />
+        <StatTile
+          label="Per 4h window (slow)"
+          :value="gp(perWindow(q.gp_hr))"
+          :hint="activeTime(q) ? `~${activeTime(q)} of clicking at player speed` : 'one GE buy-limit window'"
+        />
         <StatTile
           label="Margin / action (slow)"
           :value="gp(q.margin_slow)"
@@ -175,8 +184,11 @@ onMounted(load)
           <TableBody>
             <TableRow v-for="(l, i) in rows" :key="l.item_id ?? `leg-${i}`">
               <TableCell>
-                <span class="font-medium">{{ l.name ?? (l.item_id === null ? 'malformed leg' : `item ${l.item_id}`) }}</span>
-                <span v-if="l.item_id !== null" class="ml-1 font-mono text-xs text-muted-foreground">{{ l.item_id }}</span>
+                <div class="flex items-center gap-2">
+                  <ItemIcon :icon="l.icon" />
+                  <span class="font-medium">{{ l.name ?? (l.item_id === null ? 'malformed leg' : `item ${l.item_id}`) }}</span>
+                  <span v-if="l.item_id !== null" class="font-mono text-xs text-muted-foreground">{{ l.item_id }}</span>
+                </div>
               </TableCell>
               <TableCell class="text-right tabular-nums">{{ qty(l.qty) }}</TableCell>
               <TableCell class="text-right tabular-nums">
