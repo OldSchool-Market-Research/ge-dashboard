@@ -62,7 +62,7 @@ onMounted(async () => {
     </div>
 
     <section v-if="families.length">
-      <h2 class="mb-2 text-sm font-medium">Combine families with a measure</h2>
+      <h2 class="mb-2 text-sm font-medium">Recipe families with a measure</h2>
       <Table>
         <TableHeader>
           <TableRow>

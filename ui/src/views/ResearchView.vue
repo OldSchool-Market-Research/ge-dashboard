@@ -234,7 +234,7 @@ onMounted(async () => {
       </section>
 
       <section v-if="families.length" class="space-y-2">
-        <h2 class="text-sm font-medium">Combine families, last {{ allocation?.window_days }} days</h2>
+        <h2 class="text-sm font-medium">Lane C recipe families, last {{ allocation?.window_days }} days</h2>
         <p class="max-w-2xl text-sm text-muted-foreground">
           A record only. Most families are still far under the 20 closes a lane needs before its weight moves.
         </p>
