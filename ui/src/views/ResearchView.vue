@@ -55,6 +55,10 @@ function rate(n: number, of: number): string {
   return of > 0 ? `${Math.round((n / of) * 100)}%` : '—'
 }
 
+function refiled(p: Proposal): boolean {
+  return !!p.decided_at && p.last_seen_at > p.decided_at
+}
+
 const KIND_LABEL: Record<string, string> = {
   recipe: 'New recipe',
   lane: 'New lane',
@@ -159,7 +163,13 @@ onMounted(async () => {
           <TableBody>
             <TableRow v-for="p in decided" :key="p.proposal_id">
               <TableCell class="capitalize">{{ p.status }}</TableCell>
-              <TableCell class="font-medium">{{ p.title }}</TableCell>
+              <TableCell>
+                <div class="font-medium">{{ p.title }}</div>
+                <!-- the agent came back after the call; its evidence is the new filing's -->
+                <p v-if="refiled(p)" class="max-w-xl text-xs text-muted-foreground whitespace-pre-wrap">
+                  Filed again {{ timeAgo(p.last_seen_at) }}: {{ p.evidence }}
+                </p>
+              </TableCell>
               <TableCell class="text-muted-foreground">{{ p.decision_note ?? '—' }}</TableCell>
               <TableCell class="text-muted-foreground">{{ timeAgo(p.decided_at) }}</TableCell>
               <TableCell class="text-right">
@@ -242,7 +252,7 @@ onMounted(async () => {
           <TableBody>
             <TableRow v-for="f in families" :key="`${f.kind}:${f.family}`">
               <TableCell class="font-medium capitalize">{{ f.family }}</TableCell>
-              <TableCell class="text-muted-foreground">{{ f.kind }}</TableCell>
+              <TableCell class="text-muted-foreground">{{ f.kind || '—' }}</TableCell>
               <TableCell class="text-right tabular-nums">{{ f.closed }}</TableCell>
               <TableCell class="text-right tabular-nums">{{ rate(f.survived_6h, f.closed) }}</TableCell>
               <TableCell class="text-right tabular-nums">{{ gp(f.est_realized_gp) }}</TableCell>

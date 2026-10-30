@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Calibration factors over time: one 2px line per archetype (fixed
 // categorical hue order — identity follows the archetype across filters),
-// legend always present, direct label at each line's end, epoch-2 cut for F
+// legend always present, direct label at each line's end, each lane's epoch cut
 // drawn as a reference line. Crosshair tooltip on hover.
 import { useTheme } from '@fisherrjd/ui/theme'
 import { computed, ref } from 'vue'
@@ -51,22 +51,17 @@ function linePath(rows: CalibrationRow[]): string {
 }
 
 // A lane's epoch cut: the moment its measurement changed, so a line that jumps
-// there reads as a new measure and not a collapse. One mark per lane, at its first
-// row of each later epoch. Per-recipe rows (C:set, ...) aren't drawn, so no cut.
-const epochCuts = computed(() => {
-  const first = new Map<string, CalibrationRow>()
-  for (const r of props.history) {
-    if (r.epoch < 2 || r.archetype.includes(':')) continue
-    const key = `${r.archetype}:${r.epoch}`
-    const seen = first.get(key)
-    if (!seen || r.computed_at < seen.computed_at) first.set(key, r)
-  }
-  return [...first.values()].map((r) => ({
-    key: `${r.archetype}:${r.epoch}`,
-    x: x(r.computed_at),
-    label: `${r.archetype} epoch ${r.epoch}`,
-  }))
-})
+// there reads as a new measure and not a collapse. Marked only where the window
+// holds both sides: an old cut must not appear at the chart's left edge.
+const epochCuts = computed(() =>
+  series.value.flatMap((s) =>
+    s.rows.flatMap((r, i) =>
+      i > 0 && r.epoch !== s.rows[i - 1].epoch
+        ? [{ key: `${s.archetype}:${r.epoch}`, x: x(r.computed_at), label: `${s.archetype} epoch ${r.epoch}` }]
+        : [],
+    ),
+  ),
+)
 
 const hover = ref<{ px: number; rows: { archetype: string; color: string; factor: number }[]; when: string } | null>(null)
 
