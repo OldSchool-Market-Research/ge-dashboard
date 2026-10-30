@@ -50,7 +50,7 @@ const checks = computed(() => s.value.live_checks ?? ev.value?.checks)
         <p class="mt-0.5 line-clamp-2 text-xs text-muted-foreground" :title="s.title">{{ s.title }}</p>
       </div>
 
-      <LegFlow :legs="legs" />
+      <LegFlow v-if="legs.length" :legs="legs" />
       <p class="font-mono text-xs text-muted-foreground tabular-nums">
         {{ unitLabel(s) }}: buy {{ gp(s.entry_price) }} → sell {{ gp(s.exit_price) }}{{ isCombo(s) ? ' after tax' : '' }}
       </p>

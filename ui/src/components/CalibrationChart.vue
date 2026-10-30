@@ -50,12 +50,22 @@ function linePath(rows: CalibrationRow[]): string {
   return rows.map((r, i) => `${i ? 'L' : 'M'}${x(r.computed_at).toFixed(1)},${y(r.factor).toFixed(1)}`).join(' ')
 }
 
-// F's epoch-2 cut: the moment measurement regimes changed (fill-sim live).
-const epochCut = computed(() => {
-  const f2 = props.history
-    .filter((r) => r.archetype === 'F' && r.epoch >= 2)
-    .sort((a, b) => a.computed_at.localeCompare(b.computed_at))[0]
-  return f2 ? x(f2.computed_at) : null
+// A lane's epoch cut: the moment its measurement changed, so a line that jumps
+// there reads as a new measure and not a collapse. One mark per lane, at its first
+// row of each later epoch. Per-recipe rows (C:set, ...) aren't drawn, so no cut.
+const epochCuts = computed(() => {
+  const first = new Map<string, CalibrationRow>()
+  for (const r of props.history) {
+    if (r.epoch < 2 || r.archetype.includes(':')) continue
+    const key = `${r.archetype}:${r.epoch}`
+    const seen = first.get(key)
+    if (!seen || r.computed_at < seen.computed_at) first.set(key, r)
+  }
+  return [...first.values()].map((r) => ({
+    key: `${r.archetype}:${r.epoch}`,
+    x: x(r.computed_at),
+    label: `${r.archetype} epoch ${r.epoch}`,
+  }))
 })
 
 const hover = ref<{ px: number; rows: { archetype: string; color: string; factor: number }[]; when: string } | null>(null)
@@ -97,10 +107,10 @@ function onMove(e: MouseEvent) {
           {{ t }}
         </text>
       </g>
-      <!-- F epoch-2 cut: measurement regime break, annotated not hidden -->
-      <g v-if="epochCut !== null">
-        <line :x1="epochCut" :x2="epochCut" :y1="PAD.t" :y2="H - PAD.b" class="stroke-muted-foreground" stroke-width="1" stroke-dasharray="3 3" />
-        <text :x="epochCut + 4" :y="PAD.t + 8" class="fill-muted-foreground text-[9px]">fill-sim epoch</text>
+      <!-- a lane's epoch cut: measurement regime break, annotated not hidden -->
+      <g v-for="(c, i) in epochCuts" :key="c.key">
+        <line :x1="c.x" :x2="c.x" :y1="PAD.t" :y2="H - PAD.b" class="stroke-muted-foreground" stroke-width="1" stroke-dasharray="3 3" />
+        <text :x="c.x + 4" :y="PAD.t + 8 + i * 10" class="fill-muted-foreground text-[9px]">{{ c.label }}</text>
       </g>
       <g v-for="s in series" :key="s.archetype">
         <path :d="linePath(s.rows)" fill="none" :stroke="s.color" stroke-width="2" stroke-linejoin="round" />

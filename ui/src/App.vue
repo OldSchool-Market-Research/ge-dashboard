@@ -7,6 +7,7 @@ import {
   FactoryIcon,
   FlaskConicalIcon,
   LayoutDashboardIcon,
+  LightbulbIcon,
   PackageSearchIcon,
   PaletteIcon,
   RadioIcon,
@@ -25,6 +26,7 @@ const nav: NavSection[] = [
       { to: '/pnl', label: 'Performance', icon: TrendingUpIcon },
       { to: '/calibration', label: 'Calibration', icon: CrosshairIcon },
       { to: '/signals', label: 'Signals', icon: RadioIcon },
+      { to: '/research', label: 'Research', icon: LightbulbIcon },
     ],
   },
   {
