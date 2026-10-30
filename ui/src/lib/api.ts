@@ -415,7 +415,7 @@ export interface EvalDetail {
   legs?: { item_id: number; name: string; side: 'buy' | 'sell'; qty: number; price: number | null; age_s: number | null; vol_30m: number | null }[]
   projected_margin?: number
   combo_margin_now?: number
-  cal_factor?: number
+  kill_bar_gp?: number
 }
 
 // gp renders an amount the way a player reads one: 1.2M, 470k, 987.

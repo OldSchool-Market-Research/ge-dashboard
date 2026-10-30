@@ -91,7 +91,10 @@ const checks = computed(() => {
     } else if (c.key === 'vol_ok' && byVol.length) {
       detail = `Thinnest leg: ${byVol[0].name}, ${byVol[0].vol_30m} traded in 30 min.`
     } else if (c.key === 'margin_ok' && live.value !== null) {
-      detail = `Live margin ${gp(live.value)} ${unit.value} against the plan's ${gp(plan.value)}, both after tax.`
+      const bar = latest.value?.detail?.kill_bar_gp
+      detail = bar != null && units.value
+        ? `Live margin ${gp(live.value)} ${unit.value} x ${units.value} must stay above ${gp(bar)} a batch. The plan was ${gp(plan.value)} ${unit.value}, after tax.`
+        : `Live margin ${gp(live.value)} ${unit.value} against the plan's ${gp(plan.value)}, both after tax.`
     }
     return { ...c, detail }
   })
