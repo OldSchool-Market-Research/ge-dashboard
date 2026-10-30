@@ -4,11 +4,11 @@
 // order by archetype, never cycled. Signed gp and status chips use the
 // theme's own colors (ui() in vite.config.ts), so they match the app.
 
-export const SERIES_LIGHT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4'] as const
-export const SERIES_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181'] as const
+export const SERIES_LIGHT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300'] as const
+export const SERIES_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300'] as const
 
 // Fixed archetype -> slot assignment (identity follows the entity, not rank).
-export const ARCHETYPE_ORDER = ['F', 'C', 'B', 'V', 'U'] as const
+export const ARCHETYPE_ORDER = ['F', 'C', 'B', 'V', 'U', 'P'] as const
 
 export function archetypeColor(archetype: string, dark: boolean): string {
   const i = ARCHETYPE_ORDER.indexOf(archetype as (typeof ARCHETYPE_ORDER)[number])

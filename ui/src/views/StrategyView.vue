@@ -81,7 +81,11 @@ const checks = computed(() => {
   const legDetail = latest.value?.detail?.legs ?? []
   const unknownAge = legDetail.filter((l) => l.age_s == null).map((l) => l.name)
   const byAge = legDetail.filter((l) => l.age_s != null).sort((a, b) => b.age_s! - a.age_s!)
-  const byVol = legDetail.filter((l) => l.vol_30m != null).sort((a, b) => a.vol_30m! - b.vol_30m!)
+  // C judges volume on 4h since epoch 2, per conversion; older ticks only have 30 min
+  const has4h = legDetail.some((l) => l.vol_4h != null)
+  const byVol = has4h
+    ? legDetail.filter((l) => l.vol_4h != null).sort((a, b) => a.vol_4h! / a.qty - b.vol_4h! / b.qty)
+    : legDetail.filter((l) => l.vol_30m != null).sort((a, b) => a.vol_30m! - b.vol_30m!)
   return checkLines(latest.value?.checks).map((c) => {
     let detail = ''
     if (c.key.includes('fresh') && unknownAge.length) {
@@ -89,7 +93,9 @@ const checks = computed(() => {
     } else if (c.key.includes('fresh') && byAge.length) {
       detail = `Oldest leg: ${byAge[0].name}, last traded ${ageText(byAge[0].age_s)} ago.`
     } else if (c.key === 'vol_ok' && byVol.length) {
-      detail = `Thinnest leg: ${byVol[0].name}, ${byVol[0].vol_30m} traded in 30 min.`
+      detail = has4h
+        ? `Thinnest leg: ${byVol[0].name}, ${byVol[0].vol_4h} traded in 4h.`
+        : `Thinnest leg: ${byVol[0].name}, ${byVol[0].vol_30m} traded in 30 min.`
     } else if (c.key === 'margin_ok' && live.value !== null) {
       const bar = latest.value?.detail?.kill_bar_gp
       detail = bar != null && units.value
@@ -100,12 +106,13 @@ const checks = computed(() => {
   })
 })
 
+const legVolHeader = computed(() => (latest.value?.detail?.legs?.some((l) => l.vol_4h != null) ? 'Vol 4h' : 'Vol 30m'))
 const legRows = computed(() => {
   const detail = new Map((latest.value?.detail?.legs ?? []).map((l) => [`${l.side}:${l.item_id}`, l]))
   return legs.value.map((l) => {
     const d = detail.get(`${l.side}:${l.item_id}`)
     // single-item strategies have no per-leg detail: the eval's own volume is the item's
-    const vol = d ? (d.vol_30m ?? null) : s.value?.legs?.length ? null : (latest.value?.vol_30m ?? null)
+    const vol = d ? (d.vol_4h ?? d.vol_30m ?? null) : s.value?.legs?.length ? null : (latest.value?.vol_30m ?? null)
     return { ...l, vol, batch: l.price !== null && units.value ? l.price * l.qty * units.value : null }
   })
 })
@@ -157,21 +164,30 @@ watch(() => route.params.id, load)
           <p v-if="s.horizon" class="max-w-2xl text-sm text-muted-foreground">“{{ s.horizon }}”</p>
           <UpdatedAgo v-if="!s.closed_at" :updated-at="updatedAt" :error="refreshError" />
         </div>
-        <Card>
+        <Card v-if="legs.length">
           <CardContent class="p-5"><LegFlow :legs="legs" large /></CardContent>
         </Card>
       </div>
+
+      <p v-if="s.recipe_id" class="text-sm">
+        <RouterLink :to="`/process/${s.recipe_id}`" class="underline underline-offset-2">Recipe details and history</RouterLink>
+      </p>
 
       <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <StatTile label="Capital" :value="gp(s.capital_required)" :hint="units ? `${units.toLocaleString()} per batch` : undefined" />
         <StatTile
           label="Per cycle"
           :value="gp(s.per_cycle_gp)"
-          :hint="s.archetype === 'B' ? 'one turnaround' : 'one 4h buy-limit batch'"
+          :hint="s.archetype === 'B' ? 'one turnaround' : s.archetype === 'P' ? 'a 4h session of play' : 'one 4h buy-limit batch'"
         />
-        <StatTile label="Projected" :value="`${gp(projected)}/hr`" hint="per the plan" />
+        <StatTile label="Projected" :value="`${gp(projected)}/hr`" :hint="s.archetype === 'P' ? 'per hour of play' : 'per the plan'" />
         <StatTile label="Plan margin" :value="gp(plan)" :hint="`${unit}, after tax`" />
-        <StatTile label="Live margin" :value="gp(live)" :signed="live" :hint="`${unit}, latest eval`" />
+        <StatTile
+          label="Live margin"
+          :value="gp(live)"
+          :signed="live"
+          :hint="s.archetype === 'P' ? `${unit}, after 0.5% slippage` : `${unit}, latest eval`"
+        />
       </div>
 
       <section class="space-y-2 rounded-md border bg-card p-4">
@@ -229,7 +245,7 @@ watch(() => route.params.id, load)
           </p>
         </section>
 
-        <section class="min-w-0 space-y-3 rounded-md border bg-card p-4">
+        <section v-if="legs.length" class="min-w-0 space-y-3 rounded-md border bg-card p-4">
           <h2 class="text-sm font-medium">Legs</h2>
           <div class="overflow-x-auto">
             <Table>
@@ -240,7 +256,7 @@ watch(() => route.params.id, load)
                   <TableHead class="text-right">Plan</TableHead>
                   <TableHead class="text-right">Price now</TableHead>
                   <TableHead class="text-right">Last trade</TableHead>
-                  <TableHead class="text-right">Vol 30m</TableHead>
+                  <TableHead class="text-right">{{ legVolHeader }}</TableHead>
                   <TableHead class="text-right">Per batch</TableHead>
                 </TableRow>
               </TableHeader>

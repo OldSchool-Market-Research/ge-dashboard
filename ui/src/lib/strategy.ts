@@ -18,7 +18,7 @@ const CHECK_TEXT: Record<string, [ok: string, bad: string]> = {
   exit_reachable: ['Exit price reachable', 'Exit price out of reach'],
   trigger_fired: ['Trigger fired', 'Waiting on its trigger'],
   windows_observed: ['Seasonal windows seen', 'Seasonal windows not seen yet'],
-  floor_ok: ['Above the gp floor', 'Under the gp floor'],
+  floor_ok: ['Above the kill bar', 'Under the kill bar'],
 }
 
 export interface CheckLine {
@@ -83,6 +83,8 @@ export function legsOf(s: Strategy, icons?: Record<string, string>, ev?: Evaluat
   const e = ev === undefined ? latestEval(s) : ev
   const live = new Map(e?.detail?.legs?.map((l) => [`${l.side}:${l.item_id}`, l]) ?? [])
   const icon = (id: number) => iconMap[String(id)] ?? null
+  // P's legs live on its recipe; its one item is only a label, not a buy and a sell
+  if (isProcess(s)) return []
   if (s.legs?.length) {
     return s.legs.map((l) => {
       const side = l.side === 'sell' ? 'sell' : 'buy'
@@ -103,8 +105,14 @@ export function isCombo(s: Strategy): boolean {
   return s.archetype === 'C'
 }
 
+// P strategies are processing recipes, judged per hour of play
+export function isProcess(s: Strategy): boolean {
+  return s.archetype === 'P'
+}
+
 // what one margin is measured over
 export function unitLabel(s: Strategy): string {
+  if (isProcess(s)) return 'per action'
   return isCombo(s) ? 'per conversion' : 'per item'
 }
 
@@ -126,6 +134,7 @@ export function projectedPerHour(s: Strategy): number | null {
 // post-tax per conversion (the evaluator records it as projected_margin);
 // every other kind's exit_price is the gross sell offer, so tax it here.
 export function planMargin(s: Strategy, ev?: Evaluation | null): number {
+  if (isProcess(s)) return s.exit_price - s.entry_price // exit is post-tax per action, like C
   if (isCombo(s)) return ev?.detail?.projected_margin ?? s.exit_price - s.entry_price
   return postTax(s.exit_price) - s.entry_price
 }

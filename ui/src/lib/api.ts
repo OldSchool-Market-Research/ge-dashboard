@@ -88,6 +88,8 @@ export interface Strategy {
   closed_at: string | null
   legs?: { item_id: number; name: string; side: string; qty: number; price: number }[]
   relation_id?: number
+  // lane P: the process_recipes row this strategy runs (orchestrator migration 022)
+  recipe_id?: number
   // live=1 extras
   live_checks?: Record<string, boolean>
   live_verdict?: string
@@ -375,6 +377,18 @@ export const api = {
   signals: (limit = 100) => get<Signal[]>(`/api/signals?limit=${limit}`),
   watchlist: () => get<WatchRow[]>('/api/watchlist'),
   briefPreview: () => get<{ brief_text: string }>('/api/brief/preview'),
+  allocation: () => get<{ latest: LaneAllocation | null }>('/api/allocation'),
+  regime: (days = 1) => get<RegimeSnapshot[]>(`/api/regime?days=${days}`),
+  proposals: () => get<Proposal[]>('/api/proposals'),
+  decideProposal: async (id: number, status: ProposalStatus, note: string) => {
+    const res = await fetch(`/api/proposals/${id}/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, note }),
+    })
+    if (!res.ok) throw new ApiError(res.status, `decision ${id}: ${res.status} ${await res.text()}`)
+    return res.json() as Promise<{ proposal_id: number; status: ProposalStatus }>
+  },
   process: () => get<ProcessQuote[]>('/api/process'),
   items: () => get<ItemRow[]>('/api/items'),
   item: (id: number | string) => get<ItemDetail>(`/api/items/${id}`),
@@ -412,10 +426,101 @@ export interface Evaluation {
 // The evaluator's working (C lane carries per-leg prices and the margin the
 // strategy shipped with). Every field is optional: kinds differ.
 export interface EvalDetail {
-  legs?: { item_id: number; name: string; side: 'buy' | 'sell'; qty: number; price: number | null; age_s: number | null; vol_30m: number | null }[]
+  // vol_4h and trades_24h since C's epoch 2; older ticks have vol_30m only
+  legs?: { item_id: number; name: string; side: 'buy' | 'sell'; qty: number; price: number | null; age_s: number | null; vol_30m: number | null; vol_4h?: number | null; trades_24h?: number | null }[]
   projected_margin?: number
   combo_margin_now?: number
   kill_bar_gp?: number
+  // lane P: the recipe's margin after the haircut, and its pace per hour of play
+  margin_haircut?: number | null
+  actions_per_hour?: number | null
+  gp_hr?: number | null
+}
+
+// The lane allocation (GET /api/allocation): what each lane has earned over the
+// window, and the weights that record would set. Log mode: no run uses them yet.
+export interface YieldCounts {
+  pitched: number
+  vetoed: number
+  closed: number
+  survived_6h: number
+  confirmed: number
+  est_realized_gp: number
+}
+
+export interface LaneYield extends YieldCounts {
+  lane: string
+  // null: nothing closed
+  per_ship_gp: number | null
+  // null: below the sample gate
+  target_weight: number | null
+}
+
+// a C recipe family's record; no weight follows from it yet
+export interface FamilyYield extends YieldCounts {
+  family: string
+  kind: string
+  per_ship_gp: number | null
+}
+
+export interface SignalKindYield {
+  kind: string
+  shipped: number
+  linked: number
+  dismissed: number
+  expired: number
+  withdrawn: number
+}
+
+export interface LaneAllocation {
+  allocation_id: number
+  computed_at: string
+  mode: string
+  window_days: number
+  lanes: LaneYield[]
+  families: FamilyYield[] | null
+  signal_kinds: SignalKindYield[]
+  weights: Record<string, number>
+}
+
+// One hourly read of the market (GET /api/regime). Each number is null until
+// enough of the market has been seen, not zero.
+export interface RegimeSnapshot {
+  as_of: string
+  flip_clear_floor: number | null
+  flip_median_gp: number | null
+  flip_persistence_median: number | null
+  combo_clear_floor: number | null
+  combo_median_gp: number | null
+  volume_anomalies: number | null
+  market_vol_ratio: number | null
+}
+
+// An idea the agent filed for Jade (GET /api/proposals). It can suggest, not
+// ship: accepting records the call and changes nothing by itself. Every text
+// field is model output, so it renders as plain text.
+export type ProposalStatus = 'open' | 'accepted' | 'rejected'
+
+export interface Proposal {
+  proposal_id: number
+  run_id: number
+  created_at: string
+  last_seen_at: string
+  kind: string
+  title: string
+  detail: string
+  evidence: string
+  recipe?: {
+    inputs?: { item_id: number; qty: number }[]
+    outputs?: { item_id: number; qty: number }[]
+    reversible?: boolean
+  }
+  // what the harness found when it priced the recipe; absent for a non-recipe
+  recipe_check?: string
+  times_proposed: number
+  status: ProposalStatus
+  decided_at?: string
+  decision_note?: string
 }
 
 // gp renders an amount the way a player reads one: 1.2M, 470k, 987.
