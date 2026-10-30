@@ -300,7 +300,7 @@ export interface ItemRow {
   low_time: string | null
   margin: number | null // post-tax flip margin
   roi_pct: number | null
-  limit_profit: number | null // margin x buy limit (one 4h window)
+  limit_profit: number | null // upper bound on one 4h window: margin x min(buy limit, thinner side 24h volume / 6); null when stale, limit unknown or no volume
   high_vol_24h: number
   low_vol_24h: number
 }

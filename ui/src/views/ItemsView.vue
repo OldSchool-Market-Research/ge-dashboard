@@ -39,11 +39,11 @@ const shown = ref(PAGE)
 const columns: { key: SortKey; label: string; title?: string }[] = [
   { key: 'high', label: 'Buy price', title: 'Latest insta-buy price (what you pay to buy now)' },
   { key: 'low', label: 'Sell price', title: 'Latest insta-sell price (what you get selling now)' },
-  { key: 'margin', label: 'Margin', title: 'Flip margin after GE tax: buy at the sell price, sell at the buy price' },
+  { key: 'margin', label: 'Margin', title: 'Flip margin after GE tax: buy at the sell price, sell at the buy price. Blank unless both sides traded in the last 24h' },
   { key: 'roi', label: 'ROI' },
   { key: 'volume', label: '24h volume' },
   { key: 'limit', label: 'Buy limit' },
-  { key: 'limit_profit', label: 'Limit profit', title: 'Margin x buy limit: one 4-hour buy-limit window at the current margin' },
+  { key: 'limit_profit', label: 'Limit profit', title: 'Upper bound on one 4-hour window: margin x the buy limit, capped at a sixth of the thinner side\'s 24h volume. Blank unless both sides traded in the last 24h and the limit and volume are known' },
 ]
 
 const volume = (r: ItemRow) => r.high_vol_24h + r.low_vol_24h
