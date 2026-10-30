@@ -90,9 +90,14 @@ const rows = computed(() => {
 
 const priced = computed(() => (quotes.value ?? []).filter((q) => margin(q) !== null).length)
 const positive = computed(() => (quotes.value ?? []).filter(profitable).length)
+// a recipe with an unknown buy limit has an optimistic rate, so it can't be the headline
 const best = computed(() =>
-  [...(quotes.value ?? [])].filter((q) => gpHr(q) !== null).sort((a, b) => gpHr(b)! - gpHr(a)!)[0],
+  [...(quotes.value ?? [])]
+    .filter((q) => gpHr(q) !== null && q.unknown_limit_legs === 0)
+    .sort((a, b) => gpHr(b)! - gpHr(a)!)[0],
 )
+const UNKNOWN_LIMIT_TITLE =
+  'The Wiki doesn\'t know a buy limit for one of the inputs, so this rate ignores that cap and may be optimistic. Lane P can\'t ship it.'
 
 function age(s: number | null) {
   if (s === null) return '—'
@@ -244,6 +249,7 @@ onMounted(load)
               <TableCell class="text-right font-medium tabular-nums">
                 {{ gp(gpHr(q)) }}
                 <Badge v-if="q.throughput === 'unknown'" variant="outline" class="ml-1 text-[10px]">rate unknown</Badge>
+                <Badge v-else-if="q.unknown_limit_legs > 0" variant="outline" class="ml-1 text-[10px]" :title="UNKNOWN_LIMIT_TITLE">limit unknown</Badge>
               </TableCell>
               <TableCell class="text-right tabular-nums">
                 {{ gp(perWindow(gpHr(q))) }}
@@ -307,7 +313,10 @@ onMounted(load)
                   </div>
                 </div>
               </TableCell>
-              <TableCell class="text-right font-medium tabular-nums">{{ gp(r.median) }}</TableCell>
+              <TableCell class="text-right font-medium tabular-nums">
+                {{ gp(r.median) }}
+                <Badge v-if="r.unknown_limit_legs" variant="outline" class="ml-1 text-[10px]" :title="UNKNOWN_LIMIT_TITLE">limit unknown</Badge>
+              </TableCell>
               <TableCell class="text-right tabular-nums">{{ gp(r.p25) }}</TableCell>
               <TableCell class="text-right tabular-nums">
                 {{ r.pct_hours_positive === null ? '—' : `${r.pct_hours_positive}%` }}

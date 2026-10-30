@@ -121,7 +121,8 @@ const placedCap = computed(() =>
 )
 
 const topProcess = computed(() => {
-  const ranked = quotes.value.filter((q) => q.gp_hr !== null && q.gp_hr > 0).sort((a, b) => b.gp_hr! - a.gp_hr!).slice(0, 3)
+  // a recipe with an unknown buy limit has an optimistic rate, so it can't lead here
+  const ranked = quotes.value.filter((q) => q.gp_hr !== null && q.gp_hr > 0 && q.unknown_limit_legs === 0).sort((a, b) => b.gp_hr! - a.gp_hr!).slice(0, 3)
   const max = ranked[0]?.gp_hr ?? 1
   return ranked.map((q) => ({ q, pct: (q.gp_hr! / max) * 100 }))
 })
