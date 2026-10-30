@@ -285,6 +285,8 @@ export interface ProcessTopRow {
   pct_hours_positive: number | null
   hours_in_top10: number
   avg_last_24h: number | null
+  // latest hour; orchestrator 0.23.3+
+  unknown_limit_legs?: number
 }
 
 // Item lookup (GET /api/items*): every GE item with its latest quote from
