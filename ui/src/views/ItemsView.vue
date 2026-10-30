@@ -43,7 +43,7 @@ const columns: { key: SortKey; label: string; title?: string }[] = [
   { key: 'roi', label: 'ROI' },
   { key: 'volume', label: '24h volume' },
   { key: 'limit', label: 'Buy limit' },
-  { key: 'limit_profit', label: 'Limit profit', title: 'Margin x what one 4-hour window can fill: the buy limit, capped at a sixth of the thinner side\'s 24h volume. Blank unless both sides traded in the last 24h' },
+  { key: 'limit_profit', label: 'Limit profit', title: 'Upper bound on one 4-hour window: margin x the buy limit, capped at a sixth of the thinner side\'s 24h volume. Blank unless both sides traded in the last 24h and the limit and volume are known' },
 ]
 
 const volume = (r: ItemRow) => r.high_vol_24h + r.low_vol_24h

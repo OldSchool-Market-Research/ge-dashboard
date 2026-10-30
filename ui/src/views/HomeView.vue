@@ -71,8 +71,8 @@ const hourLabels = computed(() => {
 // "placed" ticks are a per-viewer convenience for today, kept in this
 // browser only, keyed by the viewer's LOCAL date (a UTC key would reset in
 // the evening west of UTC); the page works the same without storage. The
-// key is recomputed on every read and write, so a tab left open past
-// midnight starts the new day clean.
+// day is re-checked on every toggle and every minute refresh, so a tab left
+// open past midnight starts the new day clean.
 function dayKey(): string {
   const d = new Date()
   return `ge-placed-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -135,6 +135,8 @@ const pending = computed(() => {
 const pendingTotal = computed(() => pending.value.reduce((s, p) => s + p.n, 0))
 
 async function fetchAll() {
+  // first, so a new day starts clean even when the fetch below fails
+  rollPlacedDay()
   const [b, sig, h, runs, q] = await Promise.all([
     api.openBook(),
     api.signals(200),
@@ -147,7 +149,6 @@ async function fetchAll() {
   health.value = h
   lastRun.value = runs[0] ?? null
   quotes.value = q
-  rollPlacedDay()
 }
 const { updatedAt, refreshError, markUpdated } = useAutoRefresh(fetchAll)
 
