@@ -98,7 +98,8 @@ const laneBars = computed(() =>
       color: archetypeColor(a, mode.value === 'dark'),
     })),
 )
-const calLatest = computed(() => cal.value?.latest ?? [])
+// Lanes only: the per-recipe rows (C:set, ...) live on the Calibration page.
+const calLatest = computed(() => (cal.value?.latest ?? []).filter((c) => !c.archetype.includes(':')))
 
 const ranked = computed(() => [...closedInWindow.value].sort((a, b) => b.est_realized_gp! - a.est_realized_gp!))
 const best = computed(() => ranked.value.slice(0, 5))

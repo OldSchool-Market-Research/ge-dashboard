@@ -33,7 +33,8 @@ const domain = computed(() => {
   const ts = props.history.map((r) => new Date(r.computed_at).getTime())
   const t0 = Math.min(...ts)
   const t1 = Math.max(...ts)
-  const fMax = Math.max(0.5, ...props.history.map((r) => r.factor))
+  // Scale to the lines drawn: per-recipe rows (C:set, ...) aren't.
+  const fMax = Math.max(0.5, ...series.value.flatMap((s) => s.rows.map((r) => r.factor)))
   return { t0, t1: t1 === t0 ? t0 + 1 : t1, fMax }
 })
 
