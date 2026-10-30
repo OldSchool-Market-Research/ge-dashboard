@@ -56,7 +56,7 @@ function rate(n: number, of: number): string {
 }
 
 function refiled(p: Proposal): boolean {
-  return !!p.decided_at && p.last_seen_at > p.decided_at
+  return !!p.decided_at && Date.parse(p.last_seen_at) > Date.parse(p.decided_at)
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -84,9 +84,14 @@ async function decide(p: Proposal, status: ProposalStatus) {
 
 onMounted(async () => {
   try {
-    const [a, r, p] = await Promise.all([api.allocation(), api.regime(1), api.proposals()])
-    allocation.value = a.latest
-    regime.value = r.at(-1) ?? null
+    // the record is context: without it, the proposals still need their decisions
+    const [a, r, p] = await Promise.all([
+      api.allocation().catch(() => null),
+      api.regime(1).catch(() => null),
+      api.proposals(),
+    ])
+    allocation.value = a?.latest ?? null
+    regime.value = r?.at(-1) ?? null
     proposals.value = p
   } catch (e) {
     error.value = errorText(e)
@@ -190,8 +195,8 @@ onMounted(async () => {
             :value="regime.flip_persistence_median == null ? '—' : `${Math.round(regime.flip_persistence_median * 100)}%`"
             hint="share of 24h a flip's margin held, median"
           />
-          <StatTile label="Flip median" :value="gp(regime.flip_median_gp)" hint="per 4h batch, all flips scanned" />
-          <StatTile label="Combine median" :value="gp(regime.combo_median_gp)" hint="per 4h batch, all combines scanned" />
+          <StatTile label="Flip median" :value="gp(regime.flip_median_gp)" hint="per 4h batch, the sweep's top flips" />
+          <StatTile label="Conversion median" :value="gp(regime.combo_median_gp)" hint="per 4h batch, the sweep's top conversions" />
           <StatTile
             label="Market volume"
             :value="regime.market_vol_ratio == null ? '—' : `${regime.market_vol_ratio.toFixed(2)}×`"

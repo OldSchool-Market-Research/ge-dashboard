@@ -18,7 +18,7 @@ const CHECK_TEXT: Record<string, [ok: string, bad: string]> = {
   exit_reachable: ['Exit price reachable', 'Exit price out of reach'],
   trigger_fired: ['Trigger fired', 'Waiting on its trigger'],
   windows_observed: ['Seasonal windows seen', 'Seasonal windows not seen yet'],
-  floor_ok: ['Above the gp floor', 'Under the gp floor'],
+  floor_ok: ['Above the kill bar', 'Under the kill bar'],
 }
 
 export interface CheckLine {

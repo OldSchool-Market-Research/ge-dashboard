@@ -23,6 +23,7 @@ function signalSummary(s: Signal): string {
   const m = s.metrics
   if (s.kind === 'combo')
     return `${m.relation ?? `relation ${m.relation_id}`} ${m.direction ?? ''} · ${gp(Number(m.budget_cycle_gp ?? 0))} gp/4h`
+  if (s.kind === 'process') return `${m.name ?? ''} · ${gp(Number(m.gp_hr ?? 0))} gp per hour of play`
   if (m.gp_cycle) return `${gp(Number(m.gp_cycle))} gp/cycle`
   if (m.z) return `z=${Number(m.z).toFixed(1)}`
   return ''

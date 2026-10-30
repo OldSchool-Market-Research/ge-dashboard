@@ -182,7 +182,12 @@ watch(() => route.params.id, load)
         />
         <StatTile label="Projected" :value="`${gp(projected)}/hr`" :hint="s.archetype === 'P' ? 'per hour of play' : 'per the plan'" />
         <StatTile label="Plan margin" :value="gp(plan)" :hint="`${unit}, after tax`" />
-        <StatTile label="Live margin" :value="gp(live)" :signed="live" :hint="`${unit}, latest eval`" />
+        <StatTile
+          label="Live margin"
+          :value="gp(live)"
+          :signed="live"
+          :hint="s.archetype === 'P' ? `${unit}, after 0.5% slippage` : `${unit}, latest eval`"
+        />
       </div>
 
       <section class="space-y-2 rounded-md border bg-card p-4">

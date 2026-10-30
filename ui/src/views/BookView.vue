@@ -11,7 +11,7 @@ import StatTile from '@/components/StatTile.vue'
 import UpdatedAgo from '@/components/UpdatedAgo.vue'
 import { api, gp, type CalibrationRow, type Strategy } from '@/lib/api'
 import { useAutoRefresh } from '@/lib/autoRefresh'
-import { checkLabel, checkLines, latestEval, projectedPerHour, shortName } from '@/lib/strategy'
+import { checkLabel, checkLines, latestEval, isProcess, projectedPerHour, shortName } from '@/lib/strategy'
 
 const book = ref<Strategy[]>([])
 const calibration = ref<CalibrationRow[]>([])
@@ -37,12 +37,14 @@ const lanes = computed(() => {
   for (const s of book.value) by.set(s.archetype, (by.get(s.archetype) ?? 0) + 1)
   return [...by.entries()].map(([a, n]) => `${a} ${n}`).join(' · ')
 })
-const projected = computed(() => book.value.reduce((s, x) => s + (projectedPerHour(x) ?? 0), 0))
+// P is gp per hour of play, which never adds up with what the other lanes earn
+const passive = computed(() => book.value.filter((s) => !isProcess(s)))
+const projected = computed(() => passive.value.reduce((s, x) => s + (projectedPerHour(x) ?? 0), 0))
 // projected pace scaled by each lane's calibration factor (realized/projected)
 const calibrated = computed(() => {
   const factor = new Map(calibration.value.map((c) => [c.archetype, c.factor]))
   let sum = 0
-  for (const s of book.value) {
+  for (const s of passive.value) {
     const f = factor.get(s.archetype)
     if (f == null) return null
     sum += (projectedPerHour(s) ?? 0) * f
