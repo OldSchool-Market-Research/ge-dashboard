@@ -285,7 +285,7 @@ export interface ProcessTopRow {
   pct_hours_positive: number | null
   hours_in_top10: number
   avg_last_24h: number | null
-  // latest hour; orchestrator 0.23.3+
+  // latest hour; orchestrator 0.23.2+
   unknown_limit_legs?: number
 }
 
