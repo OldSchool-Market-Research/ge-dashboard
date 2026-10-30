@@ -89,9 +89,9 @@ onMounted(load)
           :hint="item.roi_pct === null ? undefined : `${item.roi_pct.toFixed(2)}% ROI`"
         />
         <StatTile
-          label="Per buy limit (4h)"
+          label="Per 4h window"
           :value="gp(item.limit_profit)"
-          :hint="item.buy_limit ? `limit ${item.buy_limit.toLocaleString()}` : 'buy limit unknown'"
+          :hint="item.buy_limit ? `limit ${item.buy_limit.toLocaleString()}, capped by 24h volume` : 'buy limit unknown'"
         />
         <StatTile label="24h volume" :value="volume.toLocaleString()" :hint="`${item.high_vol_24h.toLocaleString()} buys · ${item.low_vol_24h.toLocaleString()} sells`" />
         <StatTile label="High alch" :value="gp(item.highalch)" :hint="item.lowalch ? `low alch ${gp(item.lowalch)}` : undefined" />

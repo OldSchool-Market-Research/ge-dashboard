@@ -70,21 +70,34 @@ const hourLabels = computed(() => {
 
 // "placed" ticks are a per-viewer convenience for today, kept in this
 // browser only, keyed by the viewer's LOCAL date (a UTC key would reset in
-// the evening west of UTC); the page works the same without storage
-const today = new Date()
-const dayKey = `ge-placed-${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-function readPlaced(): Record<string, boolean> {
+// the evening west of UTC); the page works the same without storage. The
+// key is recomputed on every read and write, so a tab left open past
+// midnight starts the new day clean.
+function dayKey(): string {
+  const d = new Date()
+  return `ge-placed-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function readPlaced(key: string): Record<string, boolean> {
   try {
-    return JSON.parse(localStorage.getItem(dayKey) ?? '{}')
+    return JSON.parse(localStorage.getItem(key) ?? '{}')
   } catch {
     return {}
   }
 }
-const placed = ref<Record<string, boolean>>(readPlaced())
+let placedDay = dayKey()
+const placed = ref<Record<string, boolean>>(readPlaced(placedDay))
+// the minute refresh calls this: a new day reloads (usually empty) ticks
+function rollPlacedDay() {
+  const key = dayKey()
+  if (key === placedDay) return
+  placedDay = key
+  placed.value = readPlaced(key)
+}
 function togglePlaced(id: number) {
+  rollPlacedDay()
   placed.value = { ...placed.value, [id]: !placed.value[id] }
   try {
-    localStorage.setItem(dayKey, JSON.stringify(placed.value))
+    localStorage.setItem(placedDay, JSON.stringify(placed.value))
   } catch {
     // storage blocked: the tick still holds for this visit
   }
@@ -134,6 +147,7 @@ async function fetchAll() {
   health.value = h
   lastRun.value = runs[0] ?? null
   quotes.value = q
+  rollPlacedDay()
 }
 const { updatedAt, refreshError, markUpdated } = useAutoRefresh(fetchAll)
 

@@ -161,7 +161,11 @@ watch(() => route.params.id, load)
 
       <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <StatTile label="Capital" :value="gp(s.capital_required)" :hint="units ? `${units.toLocaleString()} per batch` : undefined" />
-        <StatTile label="Per cycle" :value="gp(s.per_cycle_gp)" hint="one 4h buy-limit batch" />
+        <StatTile
+          label="Per cycle"
+          :value="gp(s.per_cycle_gp)"
+          :hint="s.archetype === 'B' ? 'one turnaround' : 'one 4h buy-limit batch'"
+        />
         <StatTile label="Projected" :value="`${gp(projected)}/hr`" hint="per the plan" />
         <StatTile label="Plan margin" :value="gp(plan)" :hint="`${unit}, after tax`" />
         <StatTile label="Live margin" :value="gp(live)" :signed="live" :hint="`${unit}, latest eval`" />
