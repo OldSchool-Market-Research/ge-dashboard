@@ -64,7 +64,7 @@ onMounted(async () => {
             </TableCell>
             <TableCell class="font-medium">{{ s.item_name }}</TableCell>
             <TableCell class="tabular-nums text-muted-foreground">{{ signalSummary(s) }}</TableCell>
-            <TableCell><StatusBadge :state="s.status === 'assigned' ? 'running' : 'armed'" /></TableCell>
+            <TableCell><StatusBadge :state="s.status === 'assigned' ? 'running' : 'armed'" :hint="s.status === 'assigned' ? 'A run is looking at this signal now.' : 'Waiting for the next run to look at it.'" /></TableCell>
             <TableCell class="text-muted-foreground">{{ timeAgo(s.created_at) }}</TableCell>
           </TableRow>
         </TableBody>

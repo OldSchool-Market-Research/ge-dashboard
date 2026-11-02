@@ -12,17 +12,20 @@ import { computed, onMounted, ref } from 'vue'
 import ItemIcon from '@/components/ItemIcon.vue'
 import StatTile from '@/components/StatTile.vue'
 import UpdatedAgo from '@/components/UpdatedAgo.vue'
-import { api, gp, timeAgo, type Health, type ProcessQuote, type Run, type Signal, type Strategy } from '@/lib/api'
+import { api, gp, timeAgo, type Health, type OutcomesResponse, type ProcessQuote, type Run, type Signal, type Strategy } from '@/lib/api'
 import { useAutoRefresh } from '@/lib/autoRefresh'
 import { perWindow } from '@/lib/process'
 import { cadence, legsOf, needsYou, projectedPerHour, shortName, type Severity } from '@/lib/strategy'
 import { STATUS } from '@/lib/viz'
+import { earnedIn } from '@/lib/window'
 
 const book = ref<Strategy[]>([])
 const signals = ref<Signal[]>([])
 const quotes = ref<ProcessQuote[]>([])
 const health = ref<Health | null>(null)
 const lastRun = ref<Run | null>(null)
+const dayRuns = ref<Run[] | null>(null)
+const dayOutcomes = ref<OutcomesResponse | null>(null)
 const error = ref<string | null>(null)
 
 const SEVERITY: Record<Severity, { label: string; color: string }> = {
@@ -135,21 +138,44 @@ const pending = computed(() => {
 })
 const pendingTotal = computed(() => pending.value.reduce((s, p) => s + p.n, 0))
 
+// the last day at a glance, each number a way into its page; a failed read
+// leaves the row out rather than the whole page
+const DAY_MS = 86400_000
+const day = computed(() => {
+  if (!dayRuns.value || !dayOutcomes.value) return null
+  const asOf = Date.parse(dayOutcomes.value.as_of)
+  const closed = dayOutcomes.value.rows.filter((o) => o.closed_at && o.state !== 'vetoed')
+  const shipped = dayOutcomes.value.rows.filter((o) => o.state !== 'vetoed' && Date.parse(o.opened_at) >= asOf - DAY_MS)
+  const count = (state: string) => closed.filter((o) => o.state === state).length
+  return {
+    runs: dayRuns.value.length,
+    failed: dayRuns.value.filter((r) => r.status === 'failed').length,
+    shipped: shipped.length,
+    closed: closed.length,
+    split: `${count('confirmed')} proven · ${count('killed')} killed · ${count('expired')} timed out`,
+    earned: earnedIn(dayOutcomes.value.rows, asOf, asOf - DAY_MS, asOf),
+  }
+})
+
 async function fetchAll() {
   // first, so a new day starts clean even when the fetch below fails
   rollPlacedDay()
-  const [b, sig, h, runs, q] = await Promise.all([
+  const [b, sig, h, runs, q, dr, dayO] = await Promise.all([
     api.openBook(),
     api.signals(200),
     api.health(),
     api.runs(1),
     api.process().catch(() => [] as ProcessQuote[]),
+    api.runsSince(24).catch(() => null),
+    api.outcomes(24).catch(() => null),
   ])
   book.value = b
   signals.value = sig
   health.value = h
   lastRun.value = runs[0] ?? null
   quotes.value = q
+  dayRuns.value = dr
+  dayOutcomes.value = dayO
 }
 const { updatedAt, refreshError, markUpdated } = useAutoRefresh(fetchAll)
 
@@ -188,10 +214,28 @@ onMounted(async () => {
         <StatTile label="Cycles placed today" :value="`${placedCount} / ${book.length}`" :hint="`${gp(placedCap)} of ${gp(committed)} placed`" />
         <StatTile
           label="Engine"
-          :value="health?.active_run_id ? 'researching' : health?.ok ? 'idle' : 'unhealthy'"
+          :value="health?.active_run_id ? 'running' : health?.ok ? 'idle' : 'unhealthy'"
           :hint="lastRun ? `last run #${lastRun.run_id} ${lastRun.status}, ${timeAgo(lastRun.started_at)}` : 'no runs yet'"
         />
       </div>
+
+      <section v-if="day" class="space-y-2" aria-label="The last 24 hours">
+        <h2 class="font-mono text-[11px] tracking-widest text-muted-foreground uppercase">Last 24 hours</h2>
+        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <RouterLink to="/runs" class="block hover:opacity-80">
+            <StatTile label="Runs" :value="String(day.runs)" :hint="day.failed ? `${day.failed} failed` : 'none failed'" />
+          </RouterLink>
+          <RouterLink to="/outcomes" class="block hover:opacity-80">
+            <StatTile label="Shipped" :value="String(day.shipped)" hint="new strategies on paper" />
+          </RouterLink>
+          <RouterLink to="/outcomes" class="block hover:opacity-80">
+            <StatTile label="Closed" :value="String(day.closed)" :hint="day.split" />
+          </RouterLink>
+          <RouterLink to="/pnl" class="block hover:opacity-80">
+            <StatTile label="Paper earned" :value="`${day.earned > 0 ? '+' : ''}${gp(day.earned)}`" :signed="day.earned" hint="lane P not counted" />
+          </RouterLink>
+        </div>
+      </section>
 
       <div class="grid gap-4 xl:grid-cols-[3fr_2fr]">
         <section class="min-w-0 space-y-3 rounded-md border bg-card p-4">

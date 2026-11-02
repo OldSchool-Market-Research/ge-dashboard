@@ -235,5 +235,6 @@ export const FAIL_KIND_LABEL: Record<string, string> = {
   max_tokens: 'output token cap',
   restart: 'orchestrator restart',
   tool_error: 'tool error',
+  timeout: 'hit its time limit',
   other: 'other',
 }

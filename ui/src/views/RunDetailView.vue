@@ -13,12 +13,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@fisherrjd/ui/tabs'
 import { ArrowLeftIcon } from '@lucide/vue'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import StatTile from '@/components/StatTile.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import StrategyCard from '@/components/StrategyCard.vue'
 import { api, duration, timeAgo, tokens, type Run, type RunStats, type Strategy } from '@/lib/api'
+import { useRunStream } from '@/lib/runStream'
+import { STATE_INFO } from '@/lib/status'
+import { FAIL_KIND_LABEL } from '@/lib/strategy'
 
 const route = useRoute()
 const id = route.params.id as string
@@ -27,8 +30,9 @@ const run = ref<Run | null>(null)
 const strategies = ref<Strategy[]>([])
 const reportHtml = ref('')
 const stats = ref<RunStats | null>(null)
-const events = ref<string[]>([])
-let es: EventSource | null = null
+
+const liveId = computed(() => (run.value?.status === 'running' ? run.value.run_id : null))
+const stream = useRunStream(liveId, () => load())
 
 const shipped = computed(() => strategies.value.filter((s) => s.state !== 'vetoed'))
 const vetoed = computed(() => strategies.value.filter((s) => s.state === 'vetoed'))
@@ -51,43 +55,33 @@ async function load() {
     // Cost sidecar exists for agent >= 0.10.0 runs; 404 before that is fine.
     stats.value = await api.runStats(id).catch(() => null)
   }
-  if (r.status === 'running' && !es) {
-    es = new EventSource(`/api/runs/${id}/events`)
-    es.onmessage = (e) => events.value.push(e.data)
-    for (const t of ['started', 'agent_log', 'vetoed', 'ingested', 'finished']) {
-      es.addEventListener(t, (e) => {
-        events.value.push(`[${t}] ${(e as MessageEvent).data}`)
-        if (t === 'finished') {
-          es?.close()
-          es = null
-          load()
-        }
-      })
-    }
-  }
 }
 
 onMounted(load)
-onUnmounted(() => es?.close())
 </script>
 
 <template>
   <div v-if="run" class="space-y-5">
     <PageHeader
       :title="`Run #${run.run_id}`"
-      :description="`started ${timeAgo(run.started_at)}${run.trigger_source ? ` · ${triggerLabel[run.trigger_source]}` : ''}`"
+      :description="`started ${timeAgo(run.started_at)}${run.mode ? ` · ${run.mode}` : ''}${run.trigger_source ? ` · ${triggerLabel[run.trigger_source]}` : ''}`"
     >
       <template #actions>
         <StatusBadge :state="run.status" />
         <Button variant="outline" size="sm" as-child>
-          <RouterLink to="/"><ArrowLeftIcon /> All runs</RouterLink>
+          <RouterLink to="/runs"><ArrowLeftIcon /> All runs</RouterLink>
         </Button>
       </template>
     </PageHeader>
 
-    <p v-if="run.fail_reason" class="mb-4 rounded-md border p-3 font-mono text-xs text-muted-foreground">
-      {{ run.fail_reason }}
-    </p>
+    <p class="text-sm text-muted-foreground">{{ STATE_INFO[run.status]?.meaning }}</p>
+
+    <div v-if="run.fail_reason" class="space-y-1 rounded-md border p-3">
+      <p v-if="run.fail_kind" class="text-sm font-medium">
+        {{ FAIL_KIND_LABEL[run.fail_kind] ?? run.fail_kind }}<template v-if="run.fail_detail">: {{ run.fail_detail }}</template>
+      </p>
+      <p class="font-mono text-xs text-muted-foreground">{{ run.fail_reason }}</p>
+    </div>
 
     <div v-if="run.input_tokens != null" class="grid grid-cols-2 gap-3 md:grid-cols-4">
       <StatTile label="tokens in / out" :value="`${tokens(run.input_tokens)} / ${tokens(run.output_tokens)}`" :hint="`peak context ${tokens(run.peak_input_tokens)}`" />
@@ -97,8 +91,10 @@ onUnmounted(() => es?.close())
     </div>
 
     <div v-if="run.status === 'running'" class="mb-6 rounded-md border bg-muted/30 p-3">
-      <div class="mb-1 text-xs font-medium text-muted-foreground">live</div>
-      <pre class="max-h-64 overflow-y-auto font-mono text-xs whitespace-pre-wrap">{{ events.join('\n') || 'waiting for events…' }}</pre>
+      <div class="mb-1 text-xs font-medium text-muted-foreground">
+        live · turn {{ stream.turns.value }} · {{ stream.toolCalls.value }} tool calls<template v-if="stream.rejections.value"> · {{ stream.rejections.value }} report rejection{{ stream.rejections.value === 1 ? '' : 's' }}</template>
+      </div>
+      <pre class="max-h-64 overflow-y-auto font-mono text-xs whitespace-pre-wrap">{{ stream.lines.value.join('\n') || 'waiting for events…' }}</pre>
     </div>
 
     <Tabs default-value="report">

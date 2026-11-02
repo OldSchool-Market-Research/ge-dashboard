@@ -8,6 +8,7 @@ import {
   FlaskConicalIcon,
   LayoutDashboardIcon,
   LightbulbIcon,
+  ListChecksIcon,
   PackageSearchIcon,
   PaletteIcon,
   RadioIcon,
@@ -22,6 +23,7 @@ const nav: NavSection[] = [
     links: [
       { to: '/', label: 'Command center', icon: LayoutDashboardIcon },
       { to: '/book', label: 'Strategy board', icon: BookOpenIcon },
+      { to: '/outcomes', label: 'Outcomes', icon: ListChecksIcon },
       { to: '/runs', label: 'Run health', icon: FlaskConicalIcon },
       { to: '/pnl', label: 'Performance', icon: TrendingUpIcon },
       { to: '/calibration', label: 'Calibration', icon: CrosshairIcon },
