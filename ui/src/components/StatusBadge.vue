@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // Status chip: fixed status palette + icon + label — state is never color
 // alone (dataviz status rule). Covers strategy states, run states and live
-// eval verdicts with one vocabulary.
+// eval verdicts with one vocabulary: the plain label, its meaning on hover
+// (lib/status.ts).
 import {
+  ActivityIcon,
   CheckCircle2Icon,
-  CircleDashedIcon,
   CircleDotIcon,
   CircleSlashIcon,
   ClockIcon,
@@ -13,10 +14,12 @@ import {
   TriangleAlertIcon,
 } from '@lucide/vue'
 import { computed } from 'vue'
+import { STATE_INFO } from '@/lib/status'
 import { STATUS } from '@/lib/viz'
 
-const props = defineProps<{ state: string }>()
+const props = defineProps<{ state: string; hint?: string }>()
 
+const info = computed(() => STATE_INFO[props.state])
 const spec = computed(() => {
   switch (props.state) {
     case 'confirmed':
@@ -36,9 +39,9 @@ const spec = computed(() => {
     case 'vetoed':
       return { color: undefined, icon: CircleSlashIcon }
     case 'running':
-      return { color: undefined, icon: LoaderIcon, spin: true }
+      return { color: 'hsl(var(--chart-3))', icon: LoaderIcon, spin: true }
     default: // open
-      return { color: undefined, icon: CircleDashedIcon }
+      return { color: 'hsl(var(--chart-3))', icon: ActivityIcon }
   }
 })
 </script>
@@ -48,8 +51,9 @@ const spec = computed(() => {
     class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
     :style="spec.color ? { borderColor: spec.color, color: spec.color } : {}"
     :class="spec.color ? '' : 'text-muted-foreground'"
+    :title="hint ?? info?.meaning"
   >
     <component :is="spec.icon" class="size-3" :class="spec.spin ? 'animate-spin' : ''" />
-    {{ state }}
+    {{ info?.label ?? state }}
   </span>
 </template>

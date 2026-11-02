@@ -20,7 +20,8 @@ import StatTile from '@/components/StatTile.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import UpdatedAgo from '@/components/UpdatedAgo.vue'
 import VerdictStrip from '@/components/VerdictStrip.vue'
-import { api, errorText, gp, type Evaluation, type Strategy } from '@/lib/api'
+import StrategyStory from '@/components/StrategyStory.vue'
+import { api, errorText, gp, type Evaluation, type Outcome, type Strategy } from '@/lib/api'
 import { useAutoRefresh } from '@/lib/autoRefresh'
 import {
   ageText,
@@ -54,6 +55,23 @@ const live = computed(() => evalMargin(latest.value, combo.value))
 const projected = computed(() => (s.value ? projectedPerHour(s.value) : null))
 const units = computed(() => s.value?.units_used ?? null)
 const evalCount = computed(() => (evals.value.length >= EVAL_LIMIT ? `last ${evals.value.length}` : String(evals.value.length)))
+const outcome = ref<Outcome | null>(null)
+
+// the plan and the newest check in one line each, for the story at the top
+const planLine = computed(() => {
+  if (!s.value || !units.value) return null
+  const cycle = s.value.archetype === 'B' ? 'one turnaround' : s.value.archetype === 'P' ? 'a 4h session of play' : 'one 4h buy-limit batch'
+  return `Plan: ${gp(plan.value)} ${unit.value} × ${units.value.toLocaleString()} in ${cycle}, using ${gp(s.value.capital_required)} capital.`
+})
+const lastCheck = computed(() => {
+  const e = latest.value
+  if (!e) return null
+  const when = s.value?.closed_at ? 'Final check' : 'Latest check'
+  const d = e.detail
+  if (d?.kill_bar_gp != null && live.value !== null && units.value) return `${when}: ${gp(live.value * units.value)} a batch against a ${gp(d.kill_bar_gp)} kill bar.`
+  if (d?.kill_bar_gp_hr != null && e.realized_per_1h_gp !== null) return `${when}: ${gp(e.realized_per_1h_gp)}/hr against a ${gp(d.kill_bar_gp_hr)}/hr kill bar.`
+  return null
+})
 
 const marginPoints = computed(() => evals.value.map((e) => ({ t: Date.parse(e.at), v: evalMargin(e, combo.value) })))
 const kills = computed(() =>
@@ -120,8 +138,9 @@ const legRows = computed(() => {
 async function fetchOne() {
   const res = await api.strategy(String(route.params.id))
   strategy.value = res.strategy
-  evals.value = [...res.evaluations].reverse()
+  evals.value = [...(res.evaluations ?? [])].reverse()
   icons.value = res.item_icons ?? res.strategy.item_icons ?? {}
+  outcome.value = res.outcome ?? null
 }
 
 const { updatedAt, refreshError, markUpdated } = useAutoRefresh(async () => {
@@ -143,9 +162,14 @@ watch(() => route.params.id, load)
 
 <template>
   <div class="space-y-6">
-    <RouterLink to="/book" class="inline-flex items-center gap-1 font-mono text-xs text-primary-text hover:underline">
-      <ArrowLeftIcon class="size-3.5" /> Strategy board
-    </RouterLink>
+    <div class="flex flex-wrap gap-4">
+      <RouterLink to="/book" class="inline-flex items-center gap-1 font-mono text-xs text-primary-text hover:underline">
+        <ArrowLeftIcon class="size-3.5" /> Strategy board
+      </RouterLink>
+      <RouterLink to="/outcomes" class="inline-flex items-center gap-1 font-mono text-xs text-primary-text hover:underline">
+        <ArrowLeftIcon class="size-3.5" /> Outcomes
+      </RouterLink>
+    </div>
 
     <ErrorState v-if="error" title="Strategy unavailable" :description="error" />
 
@@ -169,6 +193,8 @@ watch(() => route.params.id, load)
         </Card>
       </div>
 
+      <StrategyStory v-if="outcome" :o="outcome" :plan-line="planLine" :last-check="lastCheck" />
+
       <p v-if="s.recipe_id" class="text-sm">
         <RouterLink :to="`/process/${s.recipe_id}`" class="underline underline-offset-2">Recipe details and history</RouterLink>
       </p>
@@ -190,7 +216,7 @@ watch(() => route.params.id, load)
         />
       </div>
 
-      <section class="space-y-2 rounded-md border bg-card p-4">
+      <section v-if="evals.length" class="space-y-2 rounded-md border bg-card p-4">
         <h2 class="text-sm font-medium">Live margin {{ unit }} against the plan, after tax</h2>
         <p v-if="marginStats" class="text-sm text-muted-foreground">
           Median live margin is <strong class="font-mono text-foreground">{{ gp(marginStats.median) }}</strong>
@@ -205,7 +231,7 @@ watch(() => route.params.id, load)
         />
       </section>
 
-      <section class="space-y-2 rounded-md border bg-card p-4">
+      <section v-if="evals.length" class="space-y-2 rounded-md border bg-card p-4">
         <h2 class="text-sm font-medium">Estimated realized pace at each eval</h2>
         <p class="text-sm text-muted-foreground">
           What the market could absorb at that moment, after the haircut. Above zero in
@@ -223,7 +249,7 @@ watch(() => route.params.id, load)
       </section>
 
       <div class="grid gap-4 lg:grid-cols-2">
-        <section class="space-y-3 rounded-md border bg-card p-4">
+        <section v-if="evals.length" class="space-y-3 rounded-md border bg-card p-4">
           <h2 class="text-sm font-medium">Latest checks, in plain English</h2>
           <ul class="space-y-2">
             <li v-for="c in checks" :key="c.key" class="flex gap-3 border bg-muted/30 p-3">

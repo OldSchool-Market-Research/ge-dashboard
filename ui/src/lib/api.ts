@@ -12,6 +12,8 @@ export interface Run {
   n_strategies: number
   // why the run started; null for rows predating orchestrator migration 017
   trigger_source: 'schedule' | 'signal' | 'empty' | 'manual' | null
+  // research (a full cycle with tools) or evaluate (judges a script-built packet)
+  mode?: 'research' | 'evaluate'
   // cost record from the agent's stats sidecar; null when absent
   turns: number | null
   tool_calls: number | null
@@ -27,7 +29,7 @@ export interface Run {
   fail_detail?: string
 }
 
-export type FailKind = 'rejected' | 'max_turns' | 'max_tokens' | 'restart' | 'tool_error' | 'other'
+export type FailKind = 'rejected' | 'max_turns' | 'max_tokens' | 'restart' | 'tool_error' | 'timeout' | 'other'
 
 export interface ShippedStrategy {
   strategy_id: number
@@ -150,6 +152,57 @@ export interface PnLResponse {
   by_archetype: Record<string, PnLBucket>
   quarantined: PnLBucket
   strategies: PnLRow[]
+}
+
+// One strategy's life for the status pages (GET /api/outcomes): every lane and
+// state, with why it closed and its paper result. A null estimate means no gp
+// figure exists (lane P is per hour of play, a vetoed strategy never traded).
+export interface Outcome {
+  strategy_id: number
+  sid: string
+  title: string
+  archetype: string
+  state: Strategy['state']
+  state_reason: string | null
+  failure_mode: string | null
+  opened_at: string
+  triggered_at: string | null
+  closed_at: string | null
+  hours: number // spent trading; 0 for one that never did
+  window_hours: number // the test it is judged over
+  n_evals: number
+  n_healthy: number
+  n_degraded: number
+  n_kill_signal: number
+  last_eval_at: string | null
+  last_verdict: Verdict | null
+  kill_streak: number // newest evaluations in a row that said kill_signal
+  med_realized_per_1h_gp: number | null
+  last_realized_per_1h_gp: number | null
+  projected_per_1h_gp: number | null
+  est_realized_gp: number | null
+  projected_gp: number | null
+  sim_scored?: boolean
+  capital_required: number | null
+  units_used: number | null
+  per_cycle_gp: number | null
+  quarantined_reason?: string
+  run_id: number
+  run_mode: 'research' | 'evaluate'
+  trigger_source: Run['trigger_source']
+  primary_item_id: number | null
+  primary_item_name: string | null
+  icon: string | null
+  // what closes it, from the evaluator's policy for this lane
+  kill_needed: number
+  confirm_healthy: number
+  confirm_ratio_bar: number
+  confirm_min_per_1h_gp?: number
+}
+
+export interface OutcomesResponse {
+  as_of: string
+  rows: Outcome[]
 }
 
 export interface CalibrationRow {
@@ -354,6 +407,8 @@ export function errorText(e: unknown, notFound = 'Not found.'): string {
 export const api = {
   health: () => get<Health>('/api/health'),
   runs: (limit = 50) => get<Run[]>(`/api/runs?limit=${limit}`),
+  // every run started in the last `hours`; null: every run on record
+  runsSince: (hours: number | null) => get<Run[]>(hours === null ? '/api/runs?limit=5000' : `/api/runs?hours=${hours}`),
   run: (id: number | string) => get<{ run: Run; strategies: Strategy[] }>(`/api/runs/${id}`),
   reportUrl: (id: number | string) => `/api/runs/${id}/report`,
   runStats: (id: number | string) => get<RunStats>(`/api/runs/${id}/stats`),
@@ -365,7 +420,7 @@ export const api = {
   openBook: () => get<Strategy[]>('/api/strategies?scope=open&live=1'),
   // newest first, up to 600
   strategy: (id: number | string) =>
-    get<{ strategy: Strategy; evaluations: Evaluation[]; item_icons?: Record<string, string> }>(
+    get<{ strategy: Strategy; evaluations: Evaluation[] | null; item_icons?: Record<string, string>; outcome?: Outcome | null }>(
       `/api/strategies/${id}`,
     ),
   // quarantined strategies stay in the API's list for the record; the
@@ -374,6 +429,11 @@ export const api = {
   pnl: async () => {
     const res = await get<PnLResponse>('/api/pnl')
     return { ...res, strategies: res.strategies.filter((r) => !r.quarantined_reason) }
+  },
+  // every strategy shipped or alive in the last `hours`; null: all of them
+  outcomes: async (hours: number | null) => {
+    const res = await get<OutcomesResponse>(hours === null ? '/api/outcomes' : `/api/outcomes?hours=${hours}`)
+    return { ...res, rows: res.rows.filter((r) => !r.quarantined_reason) }
   },
   calibration: (days = 30) => get<CalibrationResponse>(`/api/calibration?days=${days}`),
   signals: (limit = 100) => get<Signal[]>(`/api/signals?limit=${limit}`),
@@ -433,6 +493,7 @@ export interface EvalDetail {
   projected_margin?: number
   combo_margin_now?: number
   kill_bar_gp?: number
+  kill_bar_gp_hr?: number // lane P
   // lane P: the recipe's margin after the haircut, and its pace per hour of play
   margin_haircut?: number | null
   actions_per_hour?: number | null

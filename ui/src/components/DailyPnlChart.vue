@@ -8,7 +8,14 @@ import { computed, ref } from 'vue'
 import { gp } from '@/lib/api'
 import { DIVERGING } from '@/lib/viz'
 
-const props = withDefaults(defineProps<{ days: { day: string; gp: number; n: number }[]; width?: number }>(), { width: 720 })
+const props = withDefaults(
+  defineProps<{
+    // one bar per period: label is its axis text, note its tooltip line
+    days: { day: string; gp: number; n: number; label?: string; note?: string }[]
+    width?: number
+  }>(),
+  { width: 720 },
+)
 
 // viewBox width: smaller in narrow columns keeps the labels legible
 const W = props.width
@@ -58,7 +65,7 @@ const ticks = computed(() => {
 
 <template>
   <div class="relative">
-    <svg :viewBox="`0 0 ${W} ${H}`" class="w-full" role="img" aria-label="Daily realized paper gp">
+    <svg :viewBox="`0 0 ${W} ${H}`" class="w-full" role="img" aria-label="Paper gp per period">
       <!-- recessive grid + y labels -->
       <g v-for="t in ticks" :key="t">
         <line
@@ -98,7 +105,7 @@ const ticks = computed(() => {
           text-anchor="middle"
           class="fill-muted-foreground text-[10px]"
         >
-          {{ d.day.slice(5) }}
+          {{ d.label ?? d.day.slice(5) }}
         </text>
       </g>
     </svg>
@@ -112,7 +119,7 @@ const ticks = computed(() => {
       }"
     >
       <div class="font-medium">{{ days[hover].day }}</div>
-      <div class="tabular-nums">{{ gp(days[hover].gp) }} gp · {{ days[hover].n }} closed</div>
+      <div class="tabular-nums">{{ gp(days[hover].gp) }} gp · {{ days[hover].note ?? `${days[hover].n} closed` }}</div>
     </div>
   </div>
 </template>

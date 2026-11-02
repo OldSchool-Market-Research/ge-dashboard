@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// Performance: is the money real? Cumulative and daily realized, every
-// closed strategy's projection against what it realized, how strategies
+// Performance: is the money real? Paper gp earned in the window (each
+// strategy's result spread over the hours it traded, running ones included),
+// every closed strategy's projection against what it realized, how strategies
 // ended, each lane's realized share of its projection, and the best and
 // worst with their item icons. Paper estimates with the evaluator's
 // haircut: an upper bound, not a ledger.
@@ -17,57 +18,62 @@ import LineChart from '@/components/LineChart.vue'
 import ScatterChart from '@/components/ScatterChart.vue'
 import StatTile from '@/components/StatTile.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import UpdatedAgo from '@/components/UpdatedAgo.vue'
+import WindowPicker from '@/components/WindowPicker.vue'
 import { api, gp, type CalibrationResponse, type PnLResponse, type PnLRow } from '@/lib/api'
+import { useAutoRefresh } from '@/lib/autoRefresh'
 import { archetypeColor } from '@/lib/viz'
+import { accrualBuckets, earnedIn, firstStart, FOLLOW_ALL_NOTE, measureNotes, useTimeWindow } from '@/lib/window'
 
 const { mode } = useTheme()
+const { win } = useTimeWindow()
 const pnl = ref<PnLResponse | null>(null)
 const cal = ref<CalibrationResponse | null>(null)
 const error = ref<string | null>(null)
 const showAll = ref(false)
-const window = ref<14 | 30 | 90>(30)
 const lane = ref<string>('all')
 
 const total = computed(() => Object.values(pnl.value?.by_state ?? {}).reduce((s, b) => s + b.est_realized_gp, 0))
 const projectedTotal = computed(() => Object.values(pnl.value?.by_state ?? {}).reduce((s, b) => s + b.projected_gp, 0))
 const lanes = computed(() => Object.keys(pnl.value?.by_archetype ?? {}).sort())
 
-const cutoff = computed(() => Date.now() - window.value * 86400_000)
+const strategies = computed(() => pnl.value?.strategies ?? [])
+const asOf = computed(() => (pnl.value ? Date.parse(pnl.value.as_of) : Date.now()))
+const cutoff = computed(() =>
+  win.value.hours === null ? firstStart(strategies.value, asOf.value) : asOf.value - win.value.hours * 3600_000,
+)
 const closedInWindow = computed(() =>
-  (pnl.value?.strategies ?? []).filter(
-    (r) => r.closed_at && r.est_realized_gp !== null && new Date(r.closed_at).getTime() >= cutoff.value,
-  ),
+  strategies.value.filter((r) => r.closed_at && r.est_realized_gp !== null && new Date(r.closed_at).getTime() >= cutoff.value),
 )
 
-// daily realized of strategies closed that day (UTC days)
-const days = computed(() => {
-  const by = new Map<string, { gp: number; n: number }>()
-  for (const r of closedInWindow.value) {
-    const day = r.closed_at!.slice(0, 10)
-    const cur = by.get(day) ?? { gp: 0, n: 0 }
-    cur.gp += r.est_realized_gp!
-    cur.n += 1
-    by.set(day, cur)
-  }
-  return [...by.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, v]) => ({ day, ...v }))
-})
+const buckets = computed(() => accrualBuckets(strategies.value, asOf.value, cutoff.value, win.value.bucketHours))
+function bucketLabel(t: number): string {
+  const d = new Date(t)
+  const day = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const clock = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+  if (win.value.bucketHours >= 24) return day
+  return win.value.hours === 24 ? clock : `${day} ${clock}`
+}
+const days = computed(() =>
+  buckets.value.map((b) => ({
+    day: win.value.bucketHours >= 24 ? new Date(b.t).toISOString().slice(0, 10) : new Date(b.t).toLocaleString(),
+    label: bucketLabel(b.t),
+    gp: b.gp,
+    n: b.alive,
+    note: `${b.alive} strategies trading`,
+  })),
+)
 const cumulative = computed(() => {
   let run = 0
-  return days.value.map((d) => ({ t: Date.parse(`${d.day}T12:00:00Z`), v: (run += d.gp) }))
+  return buckets.value.map((b) => ({ t: b.t, v: (run += b.gp) }))
 })
-// the last 7 days' average against the 7 before
-const pace = computed(() => {
-  const now = Date.now()
-  const sum = (from: number, to: number) =>
-    (pnl.value?.strategies ?? [])
-      .filter((r) => r.closed_at && r.est_realized_gp !== null)
-      .filter((r) => {
-        const t = new Date(r.closed_at!).getTime()
-        return t >= now - from * 86400_000 && t < now - to * 86400_000
-      })
-      .reduce((s, r) => s + r.est_realized_gp!, 0)
-  return { recent: sum(7, 0) / 7, before: sum(14, 7) / 7 }
-})
+const earned = computed(() => buckets.value.reduce((s, b) => s + b.gp, 0))
+const earnedBefore = computed(() =>
+  win.value.hours === null ? null : earnedIn(strategies.value, asOf.value, cutoff.value - win.value.hours * 3600_000, cutoff.value),
+)
+// the comparison window counts too: its figure sits right beside this one
+const notes = computed(() => measureNotes(win.value.hours === null ? cutoff.value : cutoff.value - win.value.hours * 3600_000, asOf.value))
+const bucketName = computed(() => (win.value.bucketHours >= 24 ? 'day' : win.value.bucketHours === 1 ? 'hour' : `${win.value.bucketHours} hours`))
 
 const scatter = computed(() =>
   closedInWindow.value
@@ -116,9 +122,15 @@ function rowName(r: PnLRow) {
   return r.primary_item_name ?? r.title
 }
 
+async function fetchAll() {
+  ;[pnl.value, cal.value] = await Promise.all([api.pnl(), api.calibration(30).catch(() => null)])
+}
+const { updatedAt, refreshError, markUpdated } = useAutoRefresh(fetchAll)
+
 onMounted(async () => {
   try {
-    ;[pnl.value, cal.value] = await Promise.all([api.pnl(), api.calibration(30).catch(() => null)])
+    await fetchAll()
+    markUpdated()
   } catch (e) {
     error.value = String(e)
   }
@@ -130,15 +142,18 @@ onMounted(async () => {
   <div v-else-if="pnl" class="space-y-6">
     <PageHeader title="Performance" description="Is the money real? Paper estimates with the self-impact haircut: an upper bound, not a ledger.">
       <template #actions>
-        <div class="flex gap-1" role="group" aria-label="Window">
-          <Button v-for="w in [14, 30, 90] as const" :key="w" :variant="window === w ? 'secondary' : 'ghost'" size="sm" :aria-pressed="window === w" @click="window = w">
-            {{ w }}d
-          </Button>
-        </div>
+        <UpdatedAgo :updated-at="updatedAt" :error="refreshError" />
+        <WindowPicker />
       </template>
     </PageHeader>
 
     <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatTile
+        :label="`Paper earned, ${win.label}`"
+        :value="`${earned > 0 ? '+' : ''}${gp(earned)}`"
+        :signed="earned"
+        :hint="earnedBefore !== null ? `${win.before}: ${gp(earnedBefore)}` : 'since the first strategy'"
+      />
       <StatTile
         label="Realized, all time"
         :value="gp(total)"
@@ -155,31 +170,29 @@ onMounted(async () => {
         :value="calLatest.map((c) => `${c.archetype} ${c.factor.toFixed(2)}`).join(' · ') || '—'"
         hint="realized per projected gp, by lane"
       />
-      <StatTile
-        label="Pace, last 7 days"
-        :value="`${gp(pace.recent)}/day`"
-        :hint="`the 7 days before: ${gp(pace.before)}/day`"
-      />
     </div>
 
     <div class="grid gap-4 lg:grid-cols-2">
       <section class="space-y-2 rounded-md border bg-card p-4">
-        <h2 class="text-sm font-medium">Cumulative realized, last {{ window }} days</h2>
+        <h2 class="text-sm font-medium">Paper gp added up, {{ win.long }}</h2>
         <LineChart
           v-if="cumulative.length"
           :points="cumulative"
           :width="560"
           :height="260"
-          days
-          :label="`Cumulative realized over ${window} days: ${gp(cumulative.at(-1)?.v ?? 0)}`"
+          :days="win.bucketHours >= 24"
+          :label="`Paper gp added up over the ${win.long}: ${gp(cumulative.at(-1)?.v ?? 0)}`"
         />
-        <p v-else class="text-sm text-muted-foreground">Nothing closed in this window.</p>
+        <p v-else class="text-sm text-muted-foreground">Nothing traded in this window.</p>
       </section>
       <section class="space-y-2 rounded-md border bg-card p-4">
-        <h2 class="text-sm font-medium">Realized per day (strategies closed that day)</h2>
+        <h2 class="text-sm font-medium">Paper gp per {{ bucketName }}</h2>
         <DailyPnlChart :days="days" :width="560" />
       </section>
     </div>
+    <p class="text-xs text-muted-foreground">
+      Each strategy's result is spread evenly over the hours it traded, so a 48h strategy closing today doesn't land all at once, and running ones count for what they have done so far. Their figures can still move as more checks come in. {{ FOLLOW_ALL_NOTE }} <template v-for="n in notes" :key="n">{{ n }} </template>
+    </p>
 
     <section class="space-y-3 rounded-md border bg-card p-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -234,7 +247,7 @@ onMounted(async () => {
     </div>
 
     <div class="grid gap-4 lg:grid-cols-2">
-      <section v-for="board in [{ title: `Best five, last ${window} days`, rows: best, good: true }, { title: `Worst five, last ${window} days`, rows: worst, good: false }]" :key="board.title" class="space-y-2 rounded-md border bg-card p-4">
+      <section v-for="board in [{ title: `Best five closed, ${win.long}`, rows: best, good: true }, { title: `Worst five closed, ${win.long}`, rows: worst, good: false }]" :key="board.title" class="space-y-2 rounded-md border bg-card p-4">
         <h2 class="text-sm font-medium">{{ board.title }}</h2>
         <ol>
           <li v-for="r in board.rows" :key="r.strategy_id">

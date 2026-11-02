@@ -26,6 +26,11 @@ const router = createRouter({
       component: () => import('./views/StrategyView.vue'),
     },
     {
+      path: '/outcomes',
+      name: 'outcomes',
+      component: () => import('./views/OutcomesView.vue'),
+    },
+    {
       path: '/pnl',
       name: 'pnl',
       component: () => import('./views/PnlView.vue'),

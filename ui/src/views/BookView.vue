@@ -97,7 +97,7 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <PageHeader title="Strategy board" description="What the paper trader holds right now, and whether each one is working.">
+    <PageHeader title="Strategy board" description="What the paper trader holds right now, and whether each one is working. Outcomes has what closed and why.">
       <template #actions>
         <UpdatedAgo :updated-at="updatedAt" :error="refreshError" />
       </template>
@@ -106,7 +106,7 @@ onMounted(async () => {
     <ErrorState v-if="error" title="Book unavailable" :description="error" />
     <template v-else>
       <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Open" :value="String(book.length)" :hint="lanes || 'nothing open'" />
+        <StatTile label="Running" :value="String(book.length)" :hint="lanes || 'nothing running'" />
         <StatTile
           label="Capital committed"
           :value="gp(committed)"
@@ -163,7 +163,7 @@ onMounted(async () => {
       </div>
       <EmptyState
         v-if="!loading && book.length === 0"
-        title="Nothing open"
+        title="Nothing running"
         description="The book is empty. The next run fills free slots."
       />
     </template>
