@@ -265,7 +265,7 @@ watch(win, () => {
                   <TableCell class="text-right tabular-nums">{{ s.proven }}</TableCell>
                   <TableCell class="text-right tabular-nums">{{ s.killed }}</TableCell>
                   <TableCell class="text-right tabular-nums">{{ s.life === null ? '—' : hoursText(s.life) }}</TableCell>
-                  <TableCell class="text-right font-mono text-xs tabular-nums">{{ gp(s.est) }} / {{ gp(s.plan) }}</TableCell>
+                  <TableCell class="text-right font-mono text-xs whitespace-nowrap tabular-nums">{{ gp(s.est) }} / {{ gp(s.plan) }}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
