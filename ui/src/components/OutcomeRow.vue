@@ -29,7 +29,7 @@ const life = computed(() => {
     <div class="min-w-0 flex-[1_1_18rem] space-y-1">
       <div class="flex flex-wrap items-center gap-2">
         <span class="text-sm font-medium">{{ name }}</span>
-        <StatusBadge :state="running ? (o.last_verdict ?? o.state) : o.state" />
+        <StatusBadge :state="running && test.call !== 'waiting' ? (o.last_verdict ?? o.state) : o.state" />
         <span v-if="running" class="text-xs font-medium" :class="TEST_CALL_CLASS[test.call]">{{ test.call }}</span>
       </div>
       <p class="font-mono text-[11px] text-muted-foreground">{{ o.archetype }} #{{ o.strategy_id }} · {{ laneName(o.archetype) }} · {{ life }} · {{ o.run_mode }} run</p>

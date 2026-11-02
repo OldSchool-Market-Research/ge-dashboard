@@ -98,9 +98,9 @@ export function accrualBuckets(rows: Accruing[], asOf: number, from: number, buc
     let gp = 0
     let alive = 0
     for (const r of live) {
-      const share = accrued(r, asOf, lo, hi)
-      if (share !== 0) {
-        gp += share
+      const [start, end] = spanOf(r, asOf)
+      if (Math.min(end, hi) > Math.max(start, lo)) {
+        gp += accrued(r, asOf, lo, hi)
         alive++
       }
     }

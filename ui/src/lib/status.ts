@@ -7,14 +7,14 @@ import { gp, type Outcome } from './api'
 
 export const STATE_INFO: Record<string, { label: string; meaning: string }> = {
   // strategies
-  open: { label: 'Running', meaning: 'Being paper-traded now: re-priced against the live market every 5 to 15 minutes.' },
+  open: { label: 'Running', meaning: 'Being paper-traded now: re-priced against the live market every 5 minutes to an hour, depending on the lane.' },
   armed: { label: 'Waiting', meaning: 'Waiting for its trigger. Not trading yet, and it gives up after 7 days.' },
   confirmed: { label: 'Proven', meaning: 'Passed its full test window: enough healthy checks and a high enough pace.' },
   expired: { label: 'Timed out', meaning: 'Reached the end of its test window, or never started, without clearing the bar.' },
   killed: { label: 'Killed', meaning: 'Closed early because the edge ended. Not the same as losing money: what it earned first still counts.' },
   vetoed: { label: 'Vetoed', meaning: 'Refused by the rules when it shipped, so it never traded.' },
   // one check of a running strategy
-  healthy: { label: 'Healthy', meaning: 'Every check passes right now.' },
+  healthy: { label: 'Healthy', meaning: 'None of the checks that decide its health is failing right now.' },
   degraded: { label: 'Degraded', meaning: 'A soft check fails right now, such as a stale price or thin volume. It keeps running, but too many of these stop it being proven.' },
   kill_signal: { label: 'Kill signal', meaning: 'A hard check failed. A few of these in a row closes the strategy.' },
   // runs
@@ -42,6 +42,7 @@ const PACE_NOTE =
 // how a strategy's figure was reached; null when it never traded
 export function paperNote(o: Outcome): string | null {
   if (moneyOf(o).kind === 'never') return null
+  if (o.sim_scored) return "Nobody traded this. The figure is the fill simulator's final equity for the position."
   return o.archetype === 'P' ? PACE_NOTE : PAPER_NOTE
 }
 
@@ -74,7 +75,7 @@ function killDetail(o: Outcome): Record<string, Why> {
         : 'Its profit was under the kill bar'
   return {
     margin_collapse: { headline: 'Profit dried up', detail: profit },
-    leg_stale: { headline: 'Stopped trading', detail: 'A leg had no recent trade, so there was no live price to judge it on,' },
+    leg_stale: { headline: 'Stopped trading', detail: 'A leg had no recent trade to judge it on' },
     volume_dried: { headline: 'Market went thin', detail: 'Too little traded to fill its size' },
     stopped_out: { headline: 'Hit its stop price', detail: 'The price was through the kill price set when it shipped' },
     entry_unreachable: { headline: 'Entry out of reach', detail: 'The price stayed above where it planned to buy' },
@@ -114,10 +115,10 @@ const VETO_RULES: [RegExp, string][] = [
   [/claimed per_cycle_gp/, "Profit claim didn't check out"],
   [/kill_price .* already breached/, 'Already past its stop price'],
   [/legs do not match|must be recipe|not found in process_recipes|cites no recipe_id|is a C relation/, 'Recipe was wrong'],
+  [/snapshots|at the floor in only|margin_persistence/, "Margin doesn't last"],
   [/below the .* floor|below the .*gate|exceeds? .*floor/, 'Too small'],
   [/graveyarded/, 'Killed too often lately'],
   [/exceeds the .* research budget|units .* budget|capital/, 'Sizing or budget problem'],
-  [/snapshots|at the floor in only|margin_persistence/, "Margin doesn't last"],
   [/hasn't traded|no known|doesn't earn/, 'Recipe not tradeable right now'],
   [/weight 0/, 'Lane is switched off'],
 ]
@@ -159,7 +160,7 @@ export interface Money {
 // Did it make money, and how that figure was reached. Paper in every case. A
 // null estimate is a missing number, never a zero.
 export function moneyOf(o: Outcome): Money {
-  if (o.state === 'vetoed' || (o.state === 'armed' && !o.triggered_at)) return { kind: 'never', value: '—', how: 'never traded' }
+  if (o.state === 'vetoed' || (!o.triggered_at && (o.state === 'armed' || o.failure_mode === 'never_triggered'))) return { kind: 'never', value: '—', how: 'never traded' }
   const med = o.med_realized_per_1h_gp
   if (o.archetype === 'P') {
     if (med === null) return { kind: 'unknown', value: '—', how: 'no priced checks yet' }
@@ -182,7 +183,7 @@ export const MONEY_CLASS: Record<MoneyKind, string> = {
   never: 'text-muted-foreground',
 }
 
-export type TestCall = 'on track' | 'behind' | 'dying' | 'too early' | 'waiting'
+export type TestCall = 'on track' | 'behind' | 'at risk' | 'too early' | 'waiting'
 
 export interface TestProgress {
   pct: number // share of the test window gone, 0-100
@@ -210,7 +211,7 @@ export function testProgress(o: Outcome): TestProgress {
   if (o.confirm_min_per_1h_gp) parts.push(`${gp(med)}/hr (needs ${gp(o.confirm_min_per_1h_gp)}/hr)`)
   let call: TestCall = healthyOk && paceOk ? 'on track' : 'behind'
   if (o.n_evals < MIN_EVALS_FOR_CALL) call = 'too early'
-  if (o.kill_streak > 0) call = 'dying'
+  if (o.kill_streak > 0) call = 'at risk'
   return {
     pct: Math.min(100, (o.hours / window) * 100),
     call,
@@ -222,7 +223,7 @@ export function testProgress(o: Outcome): TestProgress {
 export const TEST_CALL_CLASS: Record<TestCall, string> = {
   'on track': 'text-success',
   behind: 'text-warning',
-  dying: 'text-destructive',
+  'at risk': 'text-destructive',
   'too early': 'text-muted-foreground',
   waiting: 'text-muted-foreground',
 }

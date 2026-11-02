@@ -16,7 +16,7 @@ import { api, gp, type Outcome } from '@/lib/api'
 import { useAutoRefresh } from '@/lib/autoRefresh'
 import { median } from '@/lib/runs'
 import { hoursText, STATE_INFO, testProgress, whyClosed } from '@/lib/status'
-import { earnedIn, firstStart, FOLLOW_ALL_NOTE, measureNotes, useTimeWindow } from '@/lib/window'
+import { earnedIn, FOLLOW_ALL_NOTE, measureNotes, useTimeWindow } from '@/lib/window'
 
 const PAGE = 25
 const HOUR = 3600_000
@@ -32,7 +32,9 @@ const closedSort = ref<'newest' | 'biggest'>('newest')
 const showAllClosed = ref(false)
 const showAllRunning = ref(false)
 
-const from = computed(() => (win.value.hours === null ? firstStart(all.value, asOf.value) : asOf.value - win.value.hours * HOUR))
+const from = computed(() =>
+  win.value.hours === null ? Math.min(asOf.value, ...all.value.map((o) => Date.parse(o.opened_at))) : asOf.value - win.value.hours * HOUR,
+)
 
 // the server's rule for "in the window": shipped in it, or alive for some of it
 function inWindow(o: Outcome): boolean {
@@ -73,13 +75,13 @@ const medianLife = computed(() => median(closedRows.value.map((o) => o.hours)))
 
 // why things closed badly, by the reason in words
 const deaths = computed(() => {
-  const by = new Map<string, { n: number; sum: number }>()
+  const by = new Map<string, { n: number; sum: number | null }>()
   for (const o of closedRows.value) {
     if (o.state !== 'killed' && o.state !== 'expired') continue
     const key = whyClosed(o)?.headline ?? 'Unknown'
-    const cur = by.get(key) ?? { n: 0, sum: 0 }
+    const cur = by.get(key) ?? { n: 0, sum: null }
     cur.n++
-    cur.sum += o.est_realized_gp ?? 0
+    if (o.est_realized_gp !== null) cur.sum = (cur.sum ?? 0) + o.est_realized_gp
     by.set(key, cur)
   }
   const max = Math.max(1, ...[...by.values()].map((v) => v.n))
@@ -116,7 +118,7 @@ const running = computed(() =>
     .filter((o) => isRunning(o) && passesFilter(o))
     .sort((a, b) => {
       // the ones in trouble first, then the ones furthest through their test
-      const rank = (o: Outcome) => ({ dying: 0, behind: 1, 'too early': 2, waiting: 3, 'on track': 4 })[testProgress(o).call]
+      const rank = (o: Outcome) => ({ 'at risk': 0, behind: 1, 'too early': 2, waiting: 3, 'on track': 4 })[testProgress(o).call]
       return rank(a) - rank(b) || b.hours - a.hours
     }),
 )
@@ -151,13 +153,15 @@ const { updatedAt, refreshError, markUpdated } = useAutoRefresh(fetchAll)
 async function load() {
   loading.value = true
   error.value = null
+  const pending = fetchAll()
+  const my = seq // the number fetchAll just took
   try {
-    await fetchAll()
-    markUpdated()
+    await pending
+    if (my === seq) markUpdated()
   } catch (e) {
-    error.value = String(e)
+    if (my === seq) error.value = String(e)
   } finally {
-    loading.value = false
+    if (my === seq) loading.value = false
   }
 }
 onMounted(load)
@@ -233,7 +237,7 @@ watch(win, () => {
             <span class="w-40 shrink-0 text-sm">{{ d.why }}</span>
             <div class="h-3 flex-1 bg-muted"><div class="h-full bg-destructive" :style="{ width: `${d.pct}%` }" /></div>
             <span class="w-8 text-right font-mono text-sm tabular-nums">{{ d.n }}</span>
-            <span class="w-16 text-right font-mono text-xs text-muted-foreground tabular-nums">{{ d.sum > 0 ? '+' : '' }}{{ gp(d.sum) }}</span>
+            <span class="w-16 text-right font-mono text-xs text-muted-foreground tabular-nums">{{ d.sum !== null && d.sum > 0 ? '+' : '' }}{{ gp(d.sum) }}</span>
           </div>
           <p v-if="deaths.length" class="text-xs text-muted-foreground">The gp column is what those strategies earned on paper before they closed.</p>
         </section>

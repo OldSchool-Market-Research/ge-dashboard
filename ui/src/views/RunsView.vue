@@ -154,13 +154,15 @@ const { updatedAt, refreshError, markUpdated } = useAutoRefresh(fetchAll)
 async function load() {
   loading.value = true
   error.value = null
+  const pending = fetchAll()
+  const my = seq // the number fetchAll just took
   try {
-    await fetchAll()
-    markUpdated()
+    await pending
+    if (my === seq) markUpdated()
   } catch (e) {
-    error.value = String(e)
+    if (my === seq) error.value = String(e)
   } finally {
-    loading.value = false
+    if (my === seq) loading.value = false
   }
 }
 onMounted(load)

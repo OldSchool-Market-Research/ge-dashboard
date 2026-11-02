@@ -18,7 +18,7 @@ const hover = ref<number | null>(null)
 const days = computed(() => {
   const by = new Map<string, Record<RunOutcome, number>>()
   for (const r of props.runs) {
-    const day = r.started_at.slice(0, 10)
+    const day = new Date(r.started_at).toISOString().slice(0, 10)
     const c = by.get(day) ?? { shipped: 0, vetoed: 0, empty: 0, failed: 0, running: 0 }
     c[runOutcome(r)]++
     by.set(day, c)
