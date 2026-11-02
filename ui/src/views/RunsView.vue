@@ -151,18 +151,19 @@ async function fetchAll() {
 }
 const { updatedAt, refreshError, markUpdated } = useAutoRefresh(fetchAll)
 
+// a window change starts a new load; only the newest one touches the page state
+let loads = 0
 async function load() {
+  const my = ++loads
   loading.value = true
   error.value = null
-  const pending = fetchAll()
-  const my = seq // the number fetchAll just took
   try {
-    await pending
-    if (my === seq) markUpdated()
+    await fetchAll()
+    if (my === loads) markUpdated()
   } catch (e) {
-    if (my === seq) error.value = String(e)
+    if (my === loads) error.value = String(e)
   } finally {
-    if (my === seq) loading.value = false
+    if (my === loads) loading.value = false
   }
 }
 onMounted(load)
