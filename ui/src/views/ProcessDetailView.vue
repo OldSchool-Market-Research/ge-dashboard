@@ -215,7 +215,7 @@ onMounted(load)
       </section>
 
       <p class="font-mono text-xs text-muted-foreground">
-        Source: sheet {{ detail.source }} · prices are the latest trade on each side · skill and quest requirements aren't checked
+        Source: {{ detail.source.startsWith('Main!') ? `sheet ${detail.source}` : detail.source }} · prices are the latest trade on each side · skill and quest requirements aren't checked
       </p>
     </template>
   </div>
